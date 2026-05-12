@@ -1,0 +1,20 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "src/lib/shared-types.ts",
+    "src/lib/visual-ai.ts",
+    "src/lib/server/store.ts",
+    "src/app/api/cases/missing/route.ts",
+    "src/app/api/cases/found/route.ts",
+    "src/app/api/cases/[caseId]/route.ts",
+    "src/app/api/devices/route.ts",
+    "src/app/api/ai/preview-match/route.ts",
+    "src/lib/api.ts",
+    "src/components/dashboard/DevicesManagementPanel.tsx",
+    "src/app/(screens)/report-missing/page.tsx",
+    "src/app/(screens)/case-details/page.tsx",
+    "src/app/found-dashboard/ai-analysis/page.tsx",
+    "src/app/found-dashboard/ai-match-found/page.tsx",
+    "tests/ai-device-smoke.ts"
+  ]
+}

@@ -1,0 +1,124 @@
+{
+  "users": [
+    {
+      "id": "user_admin",
+      "name": "System Admin",
+      "username": "admin",
+      "email": "admin@return.local",
+      "phone": "+201000000003",
+      "passwordHash": "scrypt:57d9bc5a616e43550670f1c5631ee1ad:89132fe3248f534547706569e2510e06be153e03377fb399b1744f52ca32728a39cb0f400b9daea5b79f383639125e7296cca31010a58569e11daec9c576ac78",
+      "avatarUrl": "/photos/5.png",
+      "role": "ADMIN",
+      "status": "ACTIVE",
+      "emailVerifiedAt": "2026-01-07T11:00:00.000Z",
+      "lastLoginAt": "2026-05-12T17:20:08.468Z",
+      "failedLoginCount": 0,
+      "createdAt": "2026-01-07T11:00:00.000Z",
+      "updatedAt": "2026-05-12T17:20:08.468Z",
+      "preference": {
+        "language": "en",
+        "darkMode": false,
+        "notificationsEnabled": true,
+        "gpsIntervalMinutes": 5,
+        "showContactToFinder": true,
+        "hideSensitiveDetails": false,
+        "allowEmergencyLocation": true,
+        "enableQr": true,
+        "enableNfc": true,
+        "enableGps": true,
+        "enableBluetooth": true,
+        "enableWifi": true,
+        "matchAlerts": true,
+        "foundCaseUpdates": true,
+        "nearbyAlerts": false,
+        "deviceAlerts": true,
+        "autoDownloadQr": false,
+        "ownerMessages": true,
+        "locationRequests": true,
+        "autoOpenProfile": true,
+        "systemAnalysis": true
+      }
+    }
+  ],
+  "sessions": [
+    {
+      "id": "session_ffb4aefdaa88fade",
+      "userId": "user_admin",
+      "tokenHash": "3d6ddb4b9130f90e937aad1e2330e73a1c1b8e7318ef7852650d52cc9711f9b6",
+      "rememberMe": false,
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36 Edg/148.0.0.0",
+      "ipHash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+      "expiresAt": "2026-06-26T17:20:08.538Z",
+      "lastSeenAt": "2026-05-12T17:20:08.543Z",
+      "createdAt": "2026-05-12T17:20:08.543Z"
+    },
+    {
+      "id": "session_dc2a1a24245205c4",
+      "userId": "user_admin",
+      "tokenHash": "22bfd0dfea25e2e1f05f4d9f52515fe9a034c75dba5318ee1e6ed9deac04e098",
+      "rememberMe": true,
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36 Edg/148.0.0.0",
+      "ipHash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+      "expiresAt": "2026-11-08T16:21:58.363Z",
+      "lastSeenAt": "2026-05-12T17:18:48.723Z",
+      "createdAt": "2026-05-12T16:21:58.364Z"
+    },
+    {
+      "id": "session_c67e526df71e40ce",
+      "userId": "user_admin",
+      "tokenHash": "c1555e068cebc459ab6091b359f89652108eb5e5690c47cc065dc52816e5c986",
+      "rememberMe": false,
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36 Edg/148.0.0.0",
+      "ipHash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+      "expiresAt": "2026-06-26T15:30:14.002Z",
+      "lastSeenAt": "2026-05-12T16:19:15.349Z",
+      "createdAt": "2026-05-12T15:30:14.003Z"
+    }
+  ],
+  "verificationRequests": [],
+  "cases": [],
+  "matches": [],
+  "notifications": [],
+  "devices": [],
+  "identificationProfiles": [],
+  "scanEvents": [],
+  "auditLogs": [
+    {
+      "id": "audit_e68d8f5d48e2",
+      "event": "auth_login_success",
+      "severity": "info",
+      "userId": "user_admin",
+      "ipHash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36 Edg/148.0.0.0",
+      "details": {
+        "rememberMe": false
+      },
+      "createdAt": "2026-05-12T17:20:08.470Z"
+    },
+    {
+      "id": "audit_e5189ba01030",
+      "event": "auth_login_success",
+      "severity": "info",
+      "userId": "user_admin",
+      "ipHash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36 Edg/148.0.0.0",
+      "details": {
+        "rememberMe": true
+      },
+      "createdAt": "2026-05-12T16:21:58.355Z"
+    },
+    {
+      "id": "audit_998574ad90f5",
+      "event": "auth_login_success",
+      "severity": "info",
+      "userId": "user_admin",
+      "ipHash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36 Edg/148.0.0.0",
+      "details": {
+        "rememberMe": false
+      },
+      "createdAt": "2026-05-12T15:30:13.996Z"
+    }
+  ],
+  "conversations": []
+}
