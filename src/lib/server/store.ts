@@ -1,6 +1,4 @@
 import { createHash, randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
-import path from 'node:path';
 import { readRawStoreFromSqlite, writeRawStoreToSqlite } from '@/lib/server/sqlite-db';
 import { capabilitiesFromDevice } from '@/lib/device-models';
 import type {
@@ -37,7 +35,6 @@ import { compareAiVisualFeatures } from '@/lib/visual-ai';
 import { ACCEPTED_MATCH_THRESHOLD, compareImageSetsWithKairos, getMatchDecision, MANUAL_REVIEW_THRESHOLD } from '@/lib/server/kairos-face';
 import { dateToIso, generateNumericCode, getPasswordStrengthMessage, hashValue, isStrongPassword, isValidEmail, normalizeEmail, normalizePhone, normalizeUsername, sanitizePlainText, slugifyName } from '@/lib/server/security';
 
-const STORE_PATH = path.join(process.cwd(), 'src', 'data', 'store.json');
 const DEFAULT_LANGUAGE: StoredPreference['language'] = 'en';
 const MIN_VISIBLE_IMAGE_SCORE = 0.75;
 const MIN_POTENTIAL_MATCH_SCORE = 0.8;
@@ -491,22 +488,6 @@ function normalizeStore(raw: any): Store {
   };
 }
 
-async function ensureDataFile() {
-  await mkdir(path.dirname(STORE_PATH), { recursive: true });
-  try {
-    await readFile(STORE_PATH, 'utf-8');
-  } catch {
-    const emptyStore = normalizeStore({});
-    const tmpPath = `${STORE_PATH}.tmp`;
-    await writeFile(tmpPath, JSON.stringify(emptyStore, null, 2), 'utf-8');
-    await rename(tmpPath, STORE_PATH);
-    try {
-      writeRawStoreToSqlite(emptyStore, false);
-    } catch (error) {
-      console.warn('Unable to seed SQLite store.', error);
-    }
-  }
-}
 
 function refreshStoredPotentialMatches(store: Store, options: { notifyOnNewMatch?: boolean } = {}) {
   const before = JSON.stringify({
@@ -585,31 +566,32 @@ async function waitForPendingWrites() {
   await storeWriteChain.catch(() => undefined);
 }
 
+let globalStoreCache: Store | null = null;
+
 async function readStoreSnapshot(): Promise<Store> {
-  await ensureDataFile();
+  if (globalStoreCache) {
+    return JSON.parse(JSON.stringify(globalStoreCache));
+  }
   try {
-    return normalizeStore(readRawStoreFromSqlite());
+    globalStoreCache = normalizeStore(await readRawStoreFromSqlite());
+    return JSON.parse(JSON.stringify(globalStoreCache));
   } catch (error) {
-    console.warn('SQLite store unavailable, falling back to JSON file.', error);
-    const raw = await readFile(STORE_PATH, 'utf-8');
-    return normalizeStore(JSON.parse(raw));
+    console.warn('Supabase store unavailable, using empty store.', error);
+    globalStoreCache = normalizeStore({});
+    return JSON.parse(JSON.stringify(globalStoreCache));
   }
 }
 
 async function persistStore(normalized: Store) {
-  await ensureDataFile();
-  const tmpPath = `${STORE_PATH}.tmp`;
-  await writeFile(tmpPath, JSON.stringify(normalized, null, 2), 'utf-8');
-  await rename(tmpPath, STORE_PATH);
+  globalStoreCache = normalizeStore(normalized);
   try {
-    writeRawStoreToSqlite(normalized, false);
+    await writeRawStoreToSqlite(normalized);
   } catch (error) {
-    console.warn('Unable to persist SQLite store.', error);
+    console.warn('Unable to persist store to Supabase.', error);
   }
 }
 
 export async function readStore(): Promise<Store> {
-  await waitForPendingWrites();
   const store = await readStoreSnapshot();
   const changed = pruneVolatileRecords(store) || reconcileStoredMatchState(store);
   if (changed) {

@@ -1,5 +1,5 @@
 import { getAdminUserStats, readStore } from '@/lib/server/store';
-import { getSqliteHealth, listSqliteTables } from '@/lib/server/sqlite-db';
+import { getSqliteHealth, getSqliteSummary } from '@/lib/server/sqlite-db';
 import { apiJson, requireAdmin } from '@/lib/server/http';
 
 export const runtime = 'nodejs';
@@ -13,10 +13,10 @@ export async function GET() {
   const store = await readStore();
 
   return apiJson({
-    engine: 'sqlite',
-    file: getSqliteHealth().file,
-    tables: listSqliteTables(),
+    engine: 'supabase',
+    file: (await getSqliteHealth()).file,
+    tables: await getSqliteSummary(),
     userMetrics: getAdminUserStats(store),
-    health: getSqliteHealth()
+    health: await getSqliteHealth()
   });
 }

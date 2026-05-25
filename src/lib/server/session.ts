@@ -90,32 +90,27 @@ export function clearSessionCookie(response: NextResponse) {
 
 export async function touchCurrentSession() {
   const token = await getTokenFromCookie();
-  if (!token) {
-    return null;
-  }
+  if (!token) return null;
 
   const tokenHash = hashValue(token);
-  let expiresAt: string | null = null;
+  const store = await readStore();
+  const session = store.sessions.find((item) => item.tokenHash === tokenHash);
+  
+  if (!session) return null;
 
-  await updateStore((store) => {
-    const session = store.sessions.find((item) => item.tokenHash === tokenHash);
-    if (!session) {
-      return;
-    }
-
-    if (shouldRefreshLastSeen(session.lastSeenAt)) {
-      const now = new Date().toISOString();
-      session.lastSeenAt = now;
-      session.expiresAt = new Date(Date.now() + sessionDurationMs(session.rememberMe)).toISOString();
-    }
-    expiresAt = session.expiresAt;
-  });
-
-  if (!expiresAt) {
-    return null;
+  if (shouldRefreshLastSeen(session.lastSeenAt)) {
+    const newExpiresAt = new Date(Date.now() + sessionDurationMs(session.rememberMe)).toISOString();
+    await updateStore((draft) => {
+      const draftSession = draft.sessions.find((item) => item.tokenHash === tokenHash);
+      if (draftSession) {
+        draftSession.lastSeenAt = new Date().toISOString();
+        draftSession.expiresAt = newExpiresAt;
+      }
+    });
+    return { token, expiresAt: newExpiresAt };
   }
 
-  return { token, expiresAt };
+  return { token, expiresAt: session.expiresAt };
 }
 
 export async function destroyCurrentSession() {

@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 enum UserRole {
@@ -76,16 +77,22 @@ enum MessageType {
 model User {
   id                       String                    @id @default(uuid()) @db.Uuid
   name                     String
+  username                 String                    @unique @default(cuid())
   email                    String                    @unique
   phone                    String?
+  dateOfBirth              String?                   @map("date_of_birth")
   passwordHash             String                    @map("password_hash")
   avatarUrl                String?                   @map("avatar_url")
   role                     UserRole                  @default(USER)
   status                   UserStatus                @default(ACTIVE)
+  emailVerifiedAt          DateTime?                 @map("email_verified_at")
+  lastLoginAt              DateTime?                 @map("last_login_at")
+  failedLoginCount         Int                       @default(0) @map("failed_login_count")
+  lockedUntil              DateTime?                 @map("locked_until")
   createdAt                DateTime                  @default(now()) @map("created_at")
   updatedAt                DateTime                  @updatedAt @map("updated_at")
   preference               UserPreference?
-  refreshTokens            AuthRefreshToken[]
+  sessions                 Session[]
   ownedCases               CaseItem[]                @relation("CaseOwner")
   caseStatusChanges        CaseStatusHistory[]       @relation("StatusChangedBy")
   confirmedMatches         CaseMatch[]               @relation("MatchConfirmedBy")
@@ -113,16 +120,37 @@ model UserPreference {
   @@map("user_preferences")
 }
 
-model AuthRefreshToken {
-  id        String   @id @default(uuid()) @db.Uuid
-  userId    String   @map("user_id") @db.Uuid
-  tokenHash String   @map("token_hash")
-  expiresAt DateTime @map("expires_at")
-  revokedAt DateTime? @map("revoked_at")
-  createdAt DateTime @default(now()) @map("created_at")
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+model Session {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  tokenHash  String   @map("token_hash")
+  csrfToken  String?  @map("csrf_token")
+  rememberMe Boolean  @default(true) @map("remember_me")
+  userAgent  String?  @map("user_agent")
+  ipHash     String?  @map("ip_hash")
+  expiresAt  DateTime @map("expires_at")
+  lastSeenAt DateTime @default(now()) @map("last_seen_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@map("auth_refresh_tokens")
+  @@index([tokenHash])
+  @@map("sessions")
+}
+
+model VerificationRequest {
+  id           String   @id @default(uuid()) @db.Uuid
+  purpose      String
+  email        String
+  userId       String?  @map("user_id") @db.Uuid
+  codeHash     String   @map("code_hash")
+  attemptsLeft Int      @default(5) @map("attempts_left")
+  expiresAt    DateTime @map("expires_at")
+  consumedAt   DateTime? @map("consumed_at")
+  payload      Json?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([email, purpose])
+  @@map("verification_requests")
 }
 
 model CaseItem {
@@ -292,6 +320,37 @@ model GpsLocation {
   @@map("gps_locations")
 }
 
+// ── LocationHistory ────────────────────────────────────────────────
+// Stores every GPS ping received from any source (A9G board, Colota app,
+// MQTT, batch upload).  Uses a raw string deviceId — no FK required —
+// so anonymous devices work without prior registration.
+model LocationHistory {
+  id         String   @id @default(uuid()) @db.Uuid
+  /// Raw device identifier — matches device_id sent by A9G or Colota
+  deviceId   String   @map("device_id")
+  lat        Float
+  lon        Float
+  battery    Int?
+  altitude   Float?
+  speed      Float?
+  /// GPS accuracy radius in metres (Colota "acc" field)
+  accuracy   Float?
+  /// Compass bearing 0-360° (Colota "bear" field)
+  bearing    Float?
+  /// "location" | "fall" | "sos"
+  alertType  String   @default("location") @map("alert_type")
+  /// "http" | "mqtt" | "colota" | "batch"
+  source     String   @default("http")
+  /// Actual GPS timestamp (from device). Falls back to receivedAt.
+  recordedAt DateTime @map("recorded_at")
+  /// Server arrival time — always set by backend
+  receivedAt DateTime @default(now()) @map("received_at")
+
+  @@index([deviceId, recordedAt])
+  @@index([recordedAt])
+  @@map("location_history")
+}
+
 model ScanEvent {
   id        String                 @id @default(uuid()) @db.Uuid
   profileId String?                @map("profile_id") @db.Uuid
@@ -393,4 +452,25 @@ model Notification {
 
   @@index([userId, isRead, createdAt])
   @@map("notifications")
+}
+
+
+model RegisteredTracker {
+  deviceId   String   @id @map("device_id")
+  label      String?
+  ownerEmail String?  @map("owner_email")
+  source     String   @default("manual")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@index([ownerEmail])
+  @@map("registered_trackers")
+}
+
+model KeyValueStore {
+  key       String   @id
+  value     String   @db.Text
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("key_value_store")
 }

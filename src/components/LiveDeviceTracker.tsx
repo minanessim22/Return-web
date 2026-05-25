@@ -39,7 +39,7 @@ export function LiveDeviceTracker({
 
   // Convert to MarkerPoint format for Map component
   const markerPoints: MarkerPoint[] = useMemo(() => {
-    if (!latestLocation) return [];
+    if (!latestLocation || latestLocation.lat === null || latestLocation.lon === null) return [];
 
     return [
       {
@@ -52,7 +52,7 @@ export function LiveDeviceTracker({
     ];
   }, [latestLocation, profileName]);
 
-  const defaultCenter: [number, number] = latestLocation
+  const defaultCenter: [number, number] = latestLocation && latestLocation.lat !== null && latestLocation.lon !== null
     ? [latestLocation.lat, latestLocation.lon]
     : [30.0444, 31.2357]; // Cairo, Egypt fallback
 
@@ -102,13 +102,12 @@ export function LiveDeviceTracker({
                   <div className="flex items-center gap-2">
                     <Battery className="w-4 h-4 text-[#60C10F]" />
                     <span
-                      className={`font-bold ${
-                        latestLocation.battery && latestLocation.battery <= 15
+                      className={`font-bold ${latestLocation.battery && latestLocation.battery <= 15
                           ? 'text-red-600'
                           : latestLocation.battery && latestLocation.battery <= 40
-                          ? 'text-yellow-600'
-                          : 'text-green-600'
-                      }`}
+                            ? 'text-yellow-600'
+                            : 'text-green-600'
+                        }`}
                     >
                       {latestLocation.battery ?? 'N/A'}%
                     </span>
@@ -121,7 +120,9 @@ export function LiveDeviceTracker({
                   </span>
                 </div>
                 <div className="text-xs text-gray-500 pt-1 border-t border-gray-200">
-                  {latestLocation.lat.toFixed(6)}, {latestLocation.lon.toFixed(6)}
+                  {latestLocation.lat !== null && latestLocation.lon !== null 
+                    ? `${latestLocation.lat.toFixed(6)}, ${latestLocation.lon.toFixed(6)}`
+                    : 'GPS Searching... (جاري تحديد الموقع)'}
                 </div>
               </div>
             </div>

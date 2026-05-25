@@ -15,7 +15,7 @@ export async function GET(request: Request, context: { params: Promise<{ table: 
   const offset = clampInteger(url.searchParams.get('offset'), 0, 10_000, 0);
 
   try {
-    return apiJson(readSqliteTable(table, limit, offset));
+    return apiJson(await readSqliteTable(table, limit, offset));
   } catch (error) {
     if (error instanceof Error && error.message === 'TABLE_NOT_FOUND') {
       return apiError(404, 'Table not found.');
