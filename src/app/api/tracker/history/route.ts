@@ -42,9 +42,9 @@ export async function GET(request: Request) {
   const to    = url.searchParams.get('to')    ?? undefined;
   const limit = parseInt(url.searchParams.get('limit') ?? '500', 10);
 
-  const rows = getLocationHistory(deviceId, from, to, limit);
+  const rows = await getLocationHistory(deviceId, from, to, limit);
 
-  const trail = rows.map((r) => ({
+  const trail = rows.map((r: any) => ({
     lat:        r.lat,
     lon:        r.lon,
     battery:    r.battery ?? undefined,

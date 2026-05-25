@@ -253,7 +253,7 @@ export async function POST(request: Request) {
       })
       .filter(Boolean) as Parameters<typeof insertLocationHistoryBatch>[0];
 
-    const { saved, skipped } = insertLocationHistoryBatch(dbRows);
+    const { saved, skipped } = await insertLocationHistoryBatch(dbRows);
 
     // Emit each to SSE so dashboard shows movement even from backfill
     const emitter = getMqttEmitter();
