@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Bell, Mail, MessageCircle, RefreshCw, Send, UserCircle, Wifi, WifiOff } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -12,7 +12,7 @@ const POLL_INTERVAL_MS = 2000;
 
 type PendingMessage = ConversationMessageItem & { failed?: boolean };
 
-export default function ChatPage() {
+function ChatPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const conversationIdParam = searchParams.get('conversationId');
@@ -378,5 +378,19 @@ export default function ChatPage() {
         </section>
       </div>
     </div>
+  );
+}
+
+export default function ChatPage() {
+  return (
+    <Suspense
+      fallback={(
+        <div className="min-h-screen bg-white flex items-center justify-center font-bold text-sm text-gray-600">
+          Loading chat...
+        </div>
+      )}
+    >
+      <ChatPageContent />
+    </Suspense>
   );
 }

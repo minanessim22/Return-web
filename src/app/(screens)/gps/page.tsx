@@ -2,7 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
   BatteryMedium,
@@ -67,7 +67,7 @@ function formFromDevice(device: DeviceItem) {
   };
 }
 
-export default function GPSPage() {
+function GPSPageContent() {
   const searchParams = useSearchParams();
   const initialDeviceId = searchParams.get('deviceId') || '';
   const [devices, setDevices] = useState<DeviceItem[]>([]);
@@ -422,5 +422,19 @@ export default function GPSPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function GPSPage() {
+  return (
+    <Suspense
+      fallback={(
+        <div className="min-h-screen bg-[#0f172a] text-white flex items-center justify-center font-bold text-lg">
+          Loading GPS dashboard...
+        </div>
+      )}
+    >
+      <GPSPageContent />
+    </Suspense>
   );
 }
