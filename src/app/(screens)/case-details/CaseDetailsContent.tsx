@@ -78,7 +78,6 @@ function saveCaseSnapshot(report: CaseItem) {
     type: report.type,
     category: report.category,
     age: report.age,
-    gender: report.gender,
     clothesColor: report.clothesColor
   };
 
