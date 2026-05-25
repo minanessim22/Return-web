@@ -34,7 +34,7 @@ export const dynamic = 'force-dynamic';
 // ── GET – List all registered trackers ────────────────────────────
 
 export async function GET() {
-  const trackers = listRegisteredTrackers();
+  const trackers = await listRegisteredTrackers();
   return Response.json(
     { trackers, count: trackers.length },
     { headers: { 'Cache-Control': 'no-store' } }
@@ -67,8 +67,8 @@ export async function POST(request: Request) {
   const label = body.label ? String(body.label).trim().slice(0, 100) : undefined;
   const ownerEmail = body.owner_email ? String(body.owner_email).trim().toLowerCase() : undefined;
 
-  const created = registerTracker(deviceId, label, ownerEmail, 'manual');
-  const tracker = getRegisteredTracker(deviceId);
+  const created = await registerTracker(deviceId, label, ownerEmail, 'manual');
+  const tracker = await getRegisteredTracker(deviceId);
 
   console.log(
     created
@@ -92,7 +92,7 @@ export async function DELETE(request: Request) {
     return Response.json({ error: 'device_id required' }, { status: 400 });
   }
 
-  const deleted = unregisterTracker(deviceId);
+  const deleted = await unregisterTracker(deviceId);
 
   if (deleted) {
     console.log(`[REGISTER] Tracker removed: ${deviceId}`);
