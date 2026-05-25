@@ -140,7 +140,7 @@ export async function POST(request: Request) {
   }
 
   // Bulk DB insert in a single transaction
-  const { saved, skipped } = insertLocationHistoryBatch(dbRows);
+  const { saved, skipped } = await insertLocationHistoryBatch(dbRows);
 
   // Emit all valid points to SSE so live map updates immediately
   const emitter = getMqttEmitter();
