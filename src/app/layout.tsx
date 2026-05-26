@@ -21,13 +21,18 @@ export default function RootLayout({
       <body suppressHydrationWarning className="h-full font-sans antialiased">
         <AuthProvider>
           <BackButtonProvider>
-            <div className="fixed left-4 top-4 z-50 pointer-events-auto md:left-6 md:top-5">
-              <Logo />
+            {/* Header for Logo and BackButton */}
+            <div className="w-full flex items-center justify-between p-4 md:p-6 bg-white/50 backdrop-blur-md sticky top-0 z-50 border-b border-gray-100 shadow-sm">
+              <div className="flex flex-col gap-2 items-start">
+                <Logo />
+                <BackButton />
+              </div>
             </div>
-            <div className="fixed left-4 top-[42px] z-50 pointer-events-auto md:left-6 md:top-[58px]">
-              <BackButton />
-            </div>
-            {children}
+            
+            {/* Main content area */}
+            <main className="flex-1 w-full flex flex-col relative z-0">
+              {children}
+            </main>
           </BackButtonProvider>
         </AuthProvider>
       </body>
