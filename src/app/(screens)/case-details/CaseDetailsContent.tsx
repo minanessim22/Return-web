@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import dynamic from 'next/dynamic';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -88,7 +88,7 @@ function saveCaseSnapshot(report: CaseItem) {
   }
 }
 
-export default function CaseDetailsContent() {
+function CaseDetailsContentInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user } = useAuth();
@@ -687,5 +687,19 @@ export default function CaseDetailsContent() {
         </div>
       </main>
     </div>
+  );
+}
+
+export default function CaseDetailsContent() {
+  return (
+    <Suspense
+      fallback={(
+        <div className="min-h-screen bg-[#014CB3] text-white flex items-center justify-center font-bold text-xl">
+          Loading case data...
+        </div>
+      )}
+    >
+      <CaseDetailsContentInner />
+    </Suspense>
   );
 }
