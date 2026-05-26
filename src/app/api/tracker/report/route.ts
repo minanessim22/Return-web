@@ -211,14 +211,19 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   ensureMqttBridge();
 
-  let body: Record<string, unknown>;
+  let body: Record<string, unknown> = {};
   try {
-    body = await request.json();
+    const text = await request.text();
+    if (text) {
+      body = JSON.parse(text);
+    }
   } catch {
-    return new Response('Invalid JSON', { status: 400 });
+    // If not JSON, it might be an empty body with query params
   }
 
-  const deviceId = String(body.device_id ?? body.deviceId ?? '').trim();
+  const url = new URL(request.url);
+  const deviceId = String(body.device_id ?? body.deviceId ?? body.id ?? body.imei ?? url.searchParams.get('id') ?? url.searchParams.get('device_id') ?? url.searchParams.get('imei') ?? '').trim();
+
   if (!deviceId) return new Response('device_id required', { status: 400 });
 
   // ── Pre-Registration check ─────────────────────────────────────
