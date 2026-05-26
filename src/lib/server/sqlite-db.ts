@@ -188,7 +188,18 @@ export async function isTrackerRegistered(deviceId: string): Promise<boolean> {
   const row = await prisma.registeredTracker.findUnique({
     where: { deviceId }
   });
-  return row !== null;
+  if (row !== null) return true;
+
+  // Fallback to checking the JSON store and auto-syncing
+  const store = await readRawStoreFromSqlite();
+  if (store && Array.isArray(store.devices)) {
+    const found = store.devices.find((d: any) => d.serialNumber === deviceId || d.id === deviceId);
+    if (found) {
+      await registerTracker(deviceId, found.label, undefined, 'auto-sync').catch(() => {});
+      return true;
+    }
+  }
+  return false;
 }
 
 export async function registerTracker(deviceId: string, label?: string, ownerEmail?: string, source = 'manual'): Promise<boolean> {
