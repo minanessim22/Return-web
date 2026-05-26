@@ -95,7 +95,7 @@ export async function POST(request: Request) {
   }
 
   // ── Pre-Registration check ─────────────────────────────────────
-  if (!isTrackerRegistered(deviceId)) {
+  if (!await isTrackerRegistered(deviceId)) {
     console.warn(`[BATCH] REJECTED unregistered device: ${deviceId}`);
     return Response.json({ error: 'Unauthorized device' }, { status: 401 });
   }
