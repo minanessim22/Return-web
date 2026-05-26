@@ -29,6 +29,71 @@
 import { ensureMqttBridge, getMqttEmitter } from '@/lib/server/mqtt-bridge';
 import type { TrackerLocationEvent } from '@/lib/server/mqtt-bridge';
 import { insertLocationHistory, insertLocationHistoryBatch, isTrackerRegistered } from '@/lib/server/sqlite-db';
+import { updateStore } from '@/lib/server/store';
+
+// ── Geofence helpers ──────────────────────────────────────────────
+
+function haversineMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6_371_000; // Earth radius in metres
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+/** Check active geofences for the given device and fire notifications on state change */
+async function checkGeofences(deviceId: string, lat: number, lon: number) {
+  try {
+    await updateStore((store) => {
+      const fences = store.geofences.filter((g) => g.isActive && g.deviceId === deviceId);
+      for (const fence of fences) {
+        const dist = haversineMeters(lat, lon, fence.lat, fence.lon);
+        const isInside = dist <= fence.radiusMeters;
+        const prevState = fence.lastState ?? 'unknown';
+        const newState = isInside ? 'inside' : 'outside';
+
+        fence.lastState = newState;
+        fence.lastCheckedAt = new Date().toISOString();
+
+        if (prevState === 'unknown') continue; // first reading, no alert
+
+        if (isInside && prevState === 'outside' && fence.alertOnEnter) {
+          // Entered the geofence
+          const owner = store.users.find((u) => u.id === fence.ownerUserId);
+          if (owner) {
+            store.notifications.unshift({
+              id: `notif_${Date.now()}`,
+              userId: fence.ownerUserId,
+              title: `📍 دخل النطاق: ${fence.name}`,
+              body: `الجهاز ${deviceId} دخل نطاق "${fence.name}"`,
+              type: 'geofence_enter',
+              isRead: false,
+              createdAt: new Date().toISOString(),
+            } as any);
+          }
+        } else if (!isInside && prevState === 'inside' && fence.alertOnExit) {
+          // Exited the geofence
+          const owner = store.users.find((u) => u.id === fence.ownerUserId);
+          if (owner) {
+            store.notifications.unshift({
+              id: `notif_${Date.now()}`,
+              userId: fence.ownerUserId,
+              title: `🚪 خرج من النطاق: ${fence.name}`,
+              body: `الجهاز ${deviceId} خرج من نطاق "${fence.name}"`,
+              type: 'geofence_exit',
+              isRead: false,
+              createdAt: new Date().toISOString(),
+            } as any);
+          }
+        }
+      }
+    });
+  } catch {
+    // Non-fatal — geofence check failure shouldn't block GPS reporting
+  }
+}
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -197,6 +262,11 @@ export async function GET(request: Request) {
 
   persistOne(deviceId, point, 'http');
   emitToSSE(deviceId, point);
+
+  // Check geofences asynchronously (non-blocking)
+  if (point.lat !== null && point.lon !== null) {
+    checkGeofences(deviceId, point.lat, point.lon!).catch(() => {});
+  }
 
   console.log(`[REPORT GET] ${point.alertType.toUpperCase()} from ${deviceId} → ${point.lat}, ${point.lon}`);
 

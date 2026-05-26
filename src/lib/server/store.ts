@@ -484,7 +484,23 @@ function normalizeStore(raw: any): Store {
     identificationProfiles: Array.isArray(raw?.identificationProfiles) ? raw.identificationProfiles.map(normalizeProfile) : [],
     scanEvents: Array.isArray(raw?.scanEvents) ? raw.scanEvents.map(normalizeScanEvent) : [],
     auditLogs: Array.isArray(raw?.auditLogs) ? raw.auditLogs.map(normalizeAuditLog) : [],
-    conversations: Array.isArray(raw?.conversations) ? raw.conversations.map(normalizeConversation) : []
+    conversations: Array.isArray(raw?.conversations) ? raw.conversations.map(normalizeConversation) : [],
+    geofences: Array.isArray(raw?.geofences) ? raw.geofences.map((g: any) => ({
+      id: String(g.id || createId('geo')),
+      ownerUserId: String(g.ownerUserId || ''),
+      deviceId: String(g.deviceId || ''),
+      name: String(g.name || 'Geofence'),
+      lat: Number.isFinite(Number(g.lat)) ? Number(g.lat) : 0,
+      lon: Number.isFinite(Number(g.lon)) ? Number(g.lon) : 0,
+      radiusMeters: Number.isFinite(Number(g.radiusMeters)) && Number(g.radiusMeters) > 0 ? Number(g.radiusMeters) : 200,
+      alertOnEnter: g.alertOnEnter !== false,
+      alertOnExit: g.alertOnExit !== false,
+      isActive: g.isActive !== false,
+      lastState: ['inside', 'outside', 'unknown'].includes(g.lastState) ? g.lastState : 'unknown',
+      lastCheckedAt: g.lastCheckedAt ? String(g.lastCheckedAt) : undefined,
+      createdAt: g.createdAt ? String(g.createdAt) : nowIso(),
+      updatedAt: g.updatedAt ? String(g.updatedAt) : nowIso(),
+    })) : []
   };
 }
 
