@@ -178,15 +178,15 @@ export async function GET(request: Request) {
   }
 
   const raw: RawPoint = {
-    lat:     url.searchParams.get('lat'),
-    lon:     url.searchParams.get('lon'),
+    lat: url.searchParams.get('lat'),
+    lon: url.searchParams.get('lon'),
     battery: url.searchParams.get('battery') ?? url.searchParams.get('batt'),
-    tst:     url.searchParams.get('tst'),
-    acc:     url.searchParams.get('acc'),
-    vel:     url.searchParams.get('vel'),
-    alt:     url.searchParams.get('alt'),
-    bear:    url.searchParams.get('bear'),
-    type:    url.searchParams.get('type'),
+    tst: url.searchParams.get('tst'),
+    acc: url.searchParams.get('acc'),
+    vel: url.searchParams.get('vel'),
+    alt: url.searchParams.get('alt'),
+    bear: url.searchParams.get('bear'),
+    type: url.searchParams.get('type'),
   };
 
   const point = parsePoint(raw);
