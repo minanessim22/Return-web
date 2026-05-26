@@ -167,7 +167,7 @@ export async function GET(request: Request) {
   ensureMqttBridge();
 
   const url = new URL(request.url);
-  const deviceId = url.searchParams.get('device_id')?.trim() || '';
+  const deviceId = url.searchParams.get('device_id')?.trim() || url.searchParams.get('id')?.trim() || url.searchParams.get('imei')?.trim() || '';
 
   if (!deviceId) return new Response('device_id required', { status: 400 });
 
