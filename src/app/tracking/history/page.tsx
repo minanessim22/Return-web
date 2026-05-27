@@ -3,17 +3,19 @@
 /**
  * /tracking/history
  * ─────────────────────────────────────────────────────────────────
- * Location History + Daily Stats + Geofencing management page.
- * Premium mobile-first design.
+ * Location History · Daily Stats · Geofencing
+ * Premium graduation-project quality design.
  * ─────────────────────────────────────────────────────────────────
  */
 
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import dynamic from 'next/dynamic';
+import Link from 'next/link';
+import type { CircleOverlay } from '@/components/Map';
 import {
-  MapPin, BarChart3, Shield, Plus, Trash2, ToggleLeft, ToggleRight,
-  Clock, Navigation, Zap, Battery, Activity, ChevronDown, ChevronUp,
-  Calendar, TrendingUp, AlertCircle, CheckCircle2, X
+  MapPin, BarChart3, Shield, Plus, Trash2,
+  Clock, Navigation, Zap, Battery, Activity, ArrowLeft,
+  Calendar, TrendingUp, AlertCircle, Eye, EyeOff, ChevronRight,
 } from 'lucide-react';
 
 const DynamicMap = dynamic(() => import('@/components/Map'), { ssr: false });
@@ -53,6 +55,7 @@ interface TrailPoint {
   lon: number;
   recordedAt: string;
   battery?: number;
+  speed?: number;
   alertType?: string;
 }
 
@@ -60,303 +63,274 @@ interface TrailPoint {
 
 function fmtTime(iso: string | null) {
   if (!iso) return '—';
-  return new Date(iso).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+  return new Date(iso).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 }
 
-function fmtDate(dateStr: string) {
-  const d = new Date(dateStr + 'T00:00:00');
-  return d.toLocaleDateString('ar-EG', { weekday: 'short', month: 'short', day: 'numeric' });
-}
+const DEVICE_ID = 'colota01';
 
-const DEVICE_ID = 'colota01'; // TODO: make dynamic from URL param or device picker
-
-// ── Component ─────────────────────────────────────────────────────
+// ── Page ──────────────────────────────────────────────────────────
 
 export default function TrackingHistoryPage() {
   const [activeTab, setActiveTab] = useState<'stats' | 'history' | 'geofences'>('stats');
-  const [stats, setStats] = useState<DayStats | null>(null);
-  const [statsLoading, setStatsLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
 
+  // Stats
+  const [stats, setStats] = useState<DayStats | null>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
+
+  // Trail
   const [trail, setTrail] = useState<TrailPoint[]>([]);
   const [trailLoading, setTrailLoading] = useState(false);
 
+  // Geofences
   const [geofences, setGeofences] = useState<Geofence[]>([]);
   const [geoLoading, setGeoLoading] = useState(false);
-  const [showCreateFence, setShowCreateFence] = useState(false);
-  const [newFence, setNewFence] = useState({ name: '', lat: '', lon: '', radiusMeters: '200', alertOnEnter: true, alertOnExit: true });
+  const [showCreate, setShowCreate] = useState(false);
+  const [fenceName, setFenceName] = useState('');
+  const [fenceRadius, setFenceRadius] = useState('200');
+  const [fenceCenter, setFenceCenter] = useState<[number, number] | null>(null);
+  const [alertEnter, setAlertEnter] = useState(true);
+  const [alertExit, setAlertExit] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
 
-  const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
-    setToast({ msg, type });
-    setTimeout(() => setToast(null), 3500);
-  };
+  // Toast
+  const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
+  const notify = (msg: string, ok = true) => { setToast({ msg, ok }); setTimeout(() => setToast(null), 3000); };
 
-  // ── Load Stats ────────────────────────────────────────────────
+  // ── Loaders ─────────────────────────────────────────────────────
 
   const loadStats = useCallback(async (date: string) => {
     setStatsLoading(true);
     try {
-      const res = await fetch(`/api/tracker/stats?device_id=${DEVICE_ID}&date=${date}`);
-      const data = await res.json();
-      setStats(data);
-    } catch {
-      setStats(null);
-    } finally {
-      setStatsLoading(false);
-    }
+      const r = await fetch(`/api/tracker/stats?device_id=${DEVICE_ID}&date=${date}`);
+      setStats(r.ok ? await r.json() : null);
+    } catch { setStats(null); }
+    finally { setStatsLoading(false); }
   }, []);
-
-  useEffect(() => { loadStats(selectedDate); }, [selectedDate, loadStats]);
-
-  // ── Load Trail ─────────────────────────────────────────────────
 
   const loadTrail = useCallback(async (date: string) => {
     setTrailLoading(true);
     try {
-      const from = `${date}T00:00:00.000Z`;
-      const to   = `${date}T23:59:59.999Z`;
-      const res = await fetch(`/api/tracker/history?device_id=${DEVICE_ID}&from=${from}&to=${to}&limit=2000`);
-      const data = await res.json();
-      setTrail(Array.isArray(data.trail) ? data.trail : []);
-    } catch {
-      setTrail([]);
-    } finally {
-      setTrailLoading(false);
-    }
+      const r = await fetch(`/api/tracker/history?device_id=${DEVICE_ID}&from=${date}T00:00:00Z&to=${date}T23:59:59Z&limit=2000`);
+      const d = await r.json();
+      setTrail(Array.isArray(d.trail) ? d.trail : []);
+    } catch { setTrail([]); }
+    finally { setTrailLoading(false); }
   }, []);
 
-  useEffect(() => {
-    if (activeTab === 'history') loadTrail(selectedDate);
-  }, [activeTab, selectedDate, loadTrail]);
-
-  // ── Load Geofences ─────────────────────────────────────────────
-
-  const loadGeofences = useCallback(async () => {
+  const loadGeo = useCallback(async () => {
     setGeoLoading(true);
     try {
-      const res = await fetch(`/api/tracker/geofences?device_id=${DEVICE_ID}`);
-      const data = await res.json();
-      setGeofences(Array.isArray(data.geofences) ? data.geofences : []);
-    } catch {
-      setGeofences([]);
-    } finally {
-      setGeoLoading(false);
-    }
+      const r = await fetch(`/api/tracker/geofences?device_id=${DEVICE_ID}`);
+      const d = await r.json();
+      setGeofences(Array.isArray(d.geofences) ? d.geofences : []);
+    } catch { setGeofences([]); }
+    finally { setGeoLoading(false); }
   }, []);
 
-  useEffect(() => {
-    if (activeTab === 'geofences') loadGeofences();
-  }, [activeTab, loadGeofences]);
+  useEffect(() => { loadStats(selectedDate); }, [selectedDate, loadStats]);
+  useEffect(() => { if (activeTab === 'history') loadTrail(selectedDate); }, [activeTab, selectedDate, loadTrail]);
+  useEffect(() => { if (activeTab === 'geofences') loadGeo(); }, [activeTab, loadGeo]);
 
-  // ── Create Geofence ────────────────────────────────────────────
+  // ── Geofence CRUD ───────────────────────────────────────────────
 
-  const handleCreateFence = async () => {
-    if (!newFence.name.trim() || !newFence.lat || !newFence.lon) {
-      showToast('يرجى ملء جميع الحقول المطلوبة', 'error');
-      return;
-    }
+  const createFence = async () => {
+    if (!fenceName.trim()) return notify('Please enter a name', false);
+    if (!fenceCenter) return notify('Click on the map to place geofence center', false);
     setSaving(true);
     try {
-      const res = await fetch('/api/tracker/geofences', {
+      const r = await fetch('/api/tracker/geofences', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          deviceId: DEVICE_ID,
-          name: newFence.name.trim(),
-          lat: Number(newFence.lat),
-          lon: Number(newFence.lon),
-          radiusMeters: Number(newFence.radiusMeters),
-          alertOnEnter: newFence.alertOnEnter,
-          alertOnExit: newFence.alertOnExit,
+          deviceId: DEVICE_ID, name: fenceName.trim(),
+          lat: fenceCenter[0], lon: fenceCenter[1],
+          radiusMeters: Number(fenceRadius) || 200,
+          alertOnEnter: alertEnter, alertOnExit: alertExit,
         }),
       });
-      if (!res.ok) throw new Error();
-      setNewFence({ name: '', lat: '', lon: '', radiusMeters: '200', alertOnEnter: true, alertOnExit: true });
-      setShowCreateFence(false);
-      await loadGeofences();
-      showToast('تم إنشاء النطاق الجغرافي بنجاح ✅');
-    } catch {
-      showToast('فشل إنشاء النطاق الجغرافي', 'error');
-    } finally {
-      setSaving(false);
-    }
+      if (!r.ok) throw new Error();
+      setFenceName(''); setFenceCenter(null); setFenceRadius('200'); setShowCreate(false);
+      await loadGeo();
+      notify('Geofence created successfully ✓');
+    } catch { notify('Failed to create geofence', false); }
+    finally { setSaving(false); }
   };
 
-  const handleToggleFence = async (fence: Geofence) => {
+  const toggleFence = async (f: Geofence) => {
     try {
-      const res = await fetch(`/api/tracker/geofences?id=${fence.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isActive: !fence.isActive }),
+      await fetch(`/api/tracker/geofences?id=${f.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isActive: !f.isActive }),
       });
-      if (!res.ok) throw new Error();
-      await loadGeofences();
-      showToast(fence.isActive ? 'تم تعطيل النطاق' : 'تم تفعيل النطاق');
-    } catch {
-      showToast('فشل تحديث النطاق', 'error');
-    }
+      await loadGeo();
+      notify(f.isActive ? 'Geofence disabled' : 'Geofence enabled');
+    } catch { notify('Update failed', false); }
   };
 
-  const handleDeleteFence = async (id: string) => {
-    if (!confirm('هل تريد حذف هذا النطاق الجغرافي؟')) return;
+  const deleteFence = async (id: string) => {
+    if (!confirm('Delete this geofence?')) return;
     try {
-      const res = await fetch(`/api/tracker/geofences?id=${id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error();
-      await loadGeofences();
-      showToast('تم حذف النطاق بنجاح');
-    } catch {
-      showToast('فشل حذف النطاق', 'error');
-    }
+      await fetch(`/api/tracker/geofences?id=${id}`, { method: 'DELETE' });
+      await loadGeo();
+      notify('Geofence deleted');
+    } catch { notify('Delete failed', false); }
   };
 
-  // ── Trail map points ───────────────────────────────────────────
+  // ── Derived ─────────────────────────────────────────────────────
 
   const trailCoords: [number, number][] = trail.map((p) => [p.lat, p.lon]);
   const mapCenter: [number, number] = trail.length > 0
     ? [trail[trail.length - 1].lat, trail[trail.length - 1].lon]
     : [30.0444, 31.2357];
 
-  // ── Render ─────────────────────────────────────────────────────
+  const fenceCircles: CircleOverlay[] = [
+    ...geofences.map((g) => ({
+      center: [g.lat, g.lon] as [number, number],
+      radiusMeters: g.radiusMeters,
+      color: g.isActive ? '#60C10F' : '#888',
+      label: `${g.name} (${g.radiusMeters}m)`,
+    })),
+    ...(fenceCenter ? [{
+      center: fenceCenter,
+      radiusMeters: Number(fenceRadius) || 200,
+      color: '#F59E0B',
+      label: fenceName || 'New geofence',
+    }] : []),
+  ];
+
+  // ── Tabs config ─────────────────────────────────────────────────
+
+  const tabs = [
+    { id: 'stats', label: 'Daily Stats', icon: BarChart3 },
+    { id: 'history', label: 'Trail Map', icon: Navigation },
+    { id: 'geofences', label: 'Geofences', icon: Shield },
+  ] as const;
 
   return (
-    <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #0a0f1e 0%, #0d1b2a 50%, #0a1628 100%)', color: '#fff', fontFamily: "'Inter', sans-serif", direction: 'rtl' }}>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30">
 
       {/* Toast */}
       {toast && (
-        <div style={{
-          position: 'fixed', top: '16px', right: '50%', transform: 'translateX(50%)',
-          zIndex: 9999, padding: '12px 24px', borderRadius: '14px', fontWeight: 700,
-          background: toast.type === 'success' ? 'rgba(96,193,15,0.95)' : 'rgba(239,68,68,0.95)',
-          color: '#fff', boxShadow: '0 8px 30px rgba(0,0,0,0.4)', fontSize: '14px',
-          animation: 'slideDown 0.3s ease'
-        }}>
-          {toast.msg}
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[9999] animate-slide-down" style={{ animation: 'slideDown 0.3s ease' }}>
+          <div className={`px-5 py-3 rounded-2xl shadow-xl font-bold text-sm backdrop-blur-lg ${
+            toast.ok ? 'bg-emerald-500/95 text-white' : 'bg-red-500/95 text-white'
+          }`}>
+            {toast.msg}
+          </div>
         </div>
       )}
 
-      {/* Header */}
-      <div style={{ background: 'linear-gradient(135deg, rgba(1,76,179,0.3), rgba(96,193,15,0.15))', borderBottom: '1px solid rgba(255,255,255,0.1)', padding: '20px 20px 16px' }}>
-        <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '4px' }}>
-            <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'linear-gradient(135deg, #014CB3, #60C10F)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Activity style={{ width: '20px', height: '20px' }} />
+      {/* ── Header ──────────────────────────────────────────────── */}
+      <header className="bg-white/80 backdrop-blur-xl border-b border-gray-100 sticky top-0 z-40">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4">
+          <div className="flex items-center gap-3 mb-3">
+            <Link href="/tracking" className="flex items-center justify-center w-9 h-9 rounded-xl bg-gray-100 hover:bg-gray-200 transition-colors">
+              <ArrowLeft className="w-4 h-4 text-gray-600" />
+            </Link>
+            <div className="flex-1 min-w-0">
+              <h1 className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight">
+                Location Intelligence
+              </h1>
+              <p className="text-xs text-gray-400 font-medium mt-0.5">
+                Device: <span className="text-[#014CB3] font-bold">{DEVICE_ID}</span>
+              </p>
             </div>
-            <div>
-              <h1 style={{ fontSize: '20px', fontWeight: 900, margin: 0 }}>سجل التتبع والنطاقات</h1>
-              <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', margin: 0 }}>جهاز: {DEVICE_ID}</p>
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={selectedDate}
+                max={new Date().toISOString().slice(0, 10)}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="text-xs font-semibold bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#014CB3]/20 focus:border-[#014CB3]"
+              />
             </div>
           </div>
 
-          {/* Date picker */}
-          <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Calendar style={{ width: '14px', height: '14px', color: '#60C10F' }} />
-            <input
-              type="date"
-              value={selectedDate}
-              max={new Date().toISOString().slice(0, 10)}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '10px', padding: '6px 12px', color: '#fff', fontSize: '13px', fontFamily: 'inherit', direction: 'ltr' }}
-            />
+          {/* Tab Bar */}
+          <div className="flex gap-1 bg-gray-100 rounded-2xl p-1">
+            {tabs.map(({ id, label, icon: Icon }) => (
+              <button
+                key={id}
+                onClick={() => setActiveTab(id)}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-xs font-bold transition-all duration-200 ${
+                  activeTab === id
+                    ? 'bg-white text-[#014CB3] shadow-sm'
+                    : 'text-gray-400 hover:text-gray-600'
+                }`}
+              >
+                <Icon className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">{label}</span>
+                <span className="sm:hidden">{label.split(' ')[0]}</span>
+              </button>
+            ))}
           </div>
         </div>
-      </div>
+      </header>
 
-      {/* Tabs */}
-      <div style={{ maxWidth: '800px', margin: '0 auto', padding: '0 16px' }}>
-        <div style={{ display: 'flex', gap: '8px', padding: '16px 0', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-          {[
-            { id: 'stats', label: 'إحصاءات يومية', icon: BarChart3 },
-            { id: 'history', label: 'مسار التنقل', icon: Navigation },
-            { id: 'geofences', label: 'النطاقات الجغرافية', icon: Shield },
-          ].map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              onClick={() => setActiveTab(id as any)}
-              style={{
-                flex: 1, padding: '10px 8px', borderRadius: '12px', border: 'none', cursor: 'pointer',
-                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px',
-                background: activeTab === id ? 'linear-gradient(135deg, #014CB3, #60C10F)' : 'rgba(255,255,255,0.06)',
-                color: activeTab === id ? '#fff' : 'rgba(255,255,255,0.5)',
-                fontWeight: activeTab === id ? 800 : 500,
-                fontSize: '11px', transition: 'all 0.2s',
-              }}
-            >
-              <Icon style={{ width: '16px', height: '16px' }} />
-              {label}
-            </button>
-          ))}
-        </div>
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6 pb-20">
 
-        {/* ── Tab: Daily Stats ───────────────────────────────────────── */}
+        {/* ══════════════════════════════════════════════════════════
+            TAB: DAILY STATS
+           ══════════════════════════════════════════════════════════ */}
         {activeTab === 'stats' && (
-          <div style={{ paddingTop: '20px', paddingBottom: '40px' }}>
+          <div>
             {statsLoading ? (
-              <div style={{ textAlign: 'center', padding: '60px 0', color: 'rgba(255,255,255,0.4)' }}>
-                <Activity style={{ width: '32px', height: '32px', margin: '0 auto 12px', animation: 'pulse 1.5s infinite' }} />
-                <p>جاري تحميل الإحصاءات...</p>
-              </div>
+              <LoadingState label="Loading statistics..." />
             ) : !stats || stats.totalPoints === 0 ? (
-              <div style={{ textAlign: 'center', padding: '60px 20px' }}>
-                <MapPin style={{ width: '40px', height: '40px', margin: '0 auto 12px', color: 'rgba(255,255,255,0.2)' }} />
-                <p style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>لا توجد بيانات لهذا اليوم</p>
-              </div>
+              <EmptyState icon={MapPin} title="No data for this day" subtitle="Select a different date or wait for the device to report." />
             ) : (
-              <>
-                {/* Main Stat Cards */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
-                  <StatCard icon={<Navigation style={{ width: '18px', height: '18px' }} />} label="المسافة" value={`${stats.totalDistanceKm} km`} color="#014CB3" />
-                  <StatCard icon={<Clock style={{ width: '18px', height: '18px' }} />} label="وقت النشاط" value={`${stats.activeMinutes} دقيقة`} color="#60C10F" />
-                  <StatCard icon={<Zap style={{ width: '18px', height: '18px' }} />} label="متوسط السرعة" value={`${stats.avgSpeedKmh} km/h`} color="#8B5CF6" />
-                  <StatCard icon={<MapPin style={{ width: '18px', height: '18px' }} />} label="إجمالي النقاط" value={`${stats.totalPoints}`} color="#F59E0B" />
+              <div className="space-y-5">
+                {/* Hero stats */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <StatCard icon={Navigation} label="Distance" value={`${stats.totalDistanceKm} km`} color="#014CB3" />
+                  <StatCard icon={Clock} label="Active time" value={`${stats.activeMinutes} min`} color="#60C10F" />
+                  <StatCard icon={Zap} label="Avg speed" value={`${stats.avgSpeedKmh} km/h`} color="#8B5CF6" />
+                  <StatCard icon={MapPin} label="Total points" value={String(stats.totalPoints)} color="#F59E0B" />
                 </div>
 
-                {/* Battery and Time */}
-                <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.08)', padding: '16px', marginBottom: '16px' }}>
-                  <p style={{ fontSize: '11px', fontWeight: 800, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '12px' }}>تفاصيل اليوم</p>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                    <InfoRow icon={<Clock style={{ width: '14px', height: '14px', color: '#60C10F' }} />} label="أول ظهور" value={fmtTime(stats.firstSeen)} />
-                    <InfoRow icon={<Clock style={{ width: '14px', height: '14px', color: '#014CB3' }} />} label="آخر ظهور" value={fmtTime(stats.lastSeen)} />
-                    <InfoRow icon={<Battery style={{ width: '14px', height: '14px', color: '#F59E0B' }} />} label="متوسط البطارية" value={stats.avgBattery !== null ? `${stats.avgBattery}%` : '—'} />
-                    <InfoRow icon={<Battery style={{ width: '14px', height: '14px', color: '#EF4444' }} />} label="أدنى بطارية" value={stats.minBattery !== null ? `${stats.minBattery}%` : '—'} />
-                    <InfoRow icon={<TrendingUp style={{ width: '14px', height: '14px', color: '#8B5CF6' }} />} label="أقصى سرعة" value={`${stats.maxSpeedKmh} km/h`} />
-                    <InfoRow icon={<AlertCircle style={{ width: '14px', height: '14px', color: '#EF4444' }} />} label="تنبيهات السقوط" value={`${stats.alertCount?.fall || 0}`} />
+                {/* Detail grid */}
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                  <div className="px-5 py-3 border-b border-gray-50">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-gray-300">Day Overview</p>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-px bg-gray-50">
+                    <DetailCell icon={<Clock className="w-3.5 h-3.5 text-emerald-500" />} label="First seen" value={fmtTime(stats.firstSeen)} />
+                    <DetailCell icon={<Clock className="w-3.5 h-3.5 text-blue-500" />} label="Last seen" value={fmtTime(stats.lastSeen)} />
+                    <DetailCell icon={<TrendingUp className="w-3.5 h-3.5 text-purple-500" />} label="Max speed" value={`${stats.maxSpeedKmh} km/h`} />
+                    <DetailCell icon={<Battery className="w-3.5 h-3.5 text-amber-500" />} label="Avg battery" value={stats.avgBattery !== null ? `${stats.avgBattery}%` : '—'} />
+                    <DetailCell icon={<Battery className="w-3.5 h-3.5 text-red-500" />} label="Min battery" value={stats.minBattery !== null ? `${stats.minBattery}%` : '—'} />
+                    <DetailCell icon={<AlertCircle className="w-3.5 h-3.5 text-red-500" />} label="Fall alerts" value={String(stats.alertCount?.fall || 0)} />
                   </div>
                 </div>
 
-                {/* Weekly Bar Chart */}
+                {/* Week chart */}
                 {stats.weekSummary && stats.weekSummary.length > 0 && (
-                  <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.08)', padding: '16px' }}>
-                    <p style={{ fontSize: '11px', fontWeight: 800, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '16px' }}>آخر 7 أيام</p>
-                    <WeekChart data={stats.weekSummary} selectedDate={selectedDate} onSelectDate={setSelectedDate} />
+                  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-gray-300 mb-4">Last 7 Days</p>
+                    <WeekChart data={stats.weekSummary} selectedDate={selectedDate} onSelect={setSelectedDate} />
                   </div>
                 )}
-              </>
+              </div>
             )}
           </div>
         )}
 
-        {/* ── Tab: History Map ────────────────────────────────────────── */}
+        {/* ══════════════════════════════════════════════════════════
+            TAB: TRAIL MAP
+           ══════════════════════════════════════════════════════════ */}
         {activeTab === 'history' && (
-          <div style={{ paddingTop: '20px', paddingBottom: '40px' }}>
+          <div className="space-y-4">
             {trailLoading ? (
-              <div style={{ textAlign: 'center', padding: '60px 0', color: 'rgba(255,255,255,0.4)' }}>
-                <Navigation style={{ width: '32px', height: '32px', margin: '0 auto 12px', animation: 'pulse 1.5s infinite' }} />
-                <p>جاري تحميل مسار التنقل...</p>
-              </div>
+              <LoadingState label="Loading trail data..." />
             ) : trail.length < 2 ? (
-              <div style={{ textAlign: 'center', padding: '60px 20px' }}>
-                <MapPin style={{ width: '40px', height: '40px', margin: '0 auto 12px', color: 'rgba(255,255,255,0.2)' }} />
-                <p style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>لا يوجد مسار لهذا اليوم</p>
-                <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '13px', marginTop: '8px' }}>يحتاج إلى نقطتين على الأقل لرسم المسار</p>
-              </div>
+              <EmptyState icon={Navigation} title="No trail for this day" subtitle="Needs at least 2 GPS points to draw a trail." />
             ) : (
               <>
-                <div style={{ borderRadius: '20px', overflow: 'hidden', height: '380px', marginBottom: '16px', border: '1px solid rgba(255,255,255,0.1)' }}>
+                <div className="rounded-2xl overflow-hidden border border-gray-200 shadow-lg" style={{ height: '420px' }}>
                   <DynamicMap
                     center={mapCenter}
-                    markers={[{ position: mapCenter, label: 'آخر موقع', live: true }]}
+                    markers={[{ position: mapCenter, label: 'Last location', live: true }]}
                     trail={trailCoords}
                     zoom={14}
                     scrollWheelZoom={true}
@@ -365,16 +339,26 @@ export default function TrackingHistoryPage() {
                   />
                 </div>
 
-                <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.08)', padding: '16px' }}>
-                  <p style={{ fontSize: '11px', fontWeight: 800, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '12px' }}>نقاط المسار ({trail.length})</p>
-                  <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
-                    {trail.slice(0, 50).map((pt, i) => (
-                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0, background: pt.alertType === 'fall' ? '#EF4444' : '#60C10F' }} />
-                        <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace', flexShrink: 0 }}>{new Date(pt.recordedAt).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
-                        <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)', fontFamily: 'monospace' }}>{pt.lat.toFixed(5)}, {pt.lon.toFixed(5)}</span>
+                {/* Trail points list */}
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                  <div className="px-5 py-3 border-b border-gray-50 flex items-center justify-between">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-gray-300">Trail Points</p>
+                    <span className="text-xs font-bold text-gray-400">{trail.length} points</span>
+                  </div>
+                  <div className="max-h-[320px] overflow-y-auto divide-y divide-gray-50">
+                    {trail.slice(0, 80).map((pt, i) => (
+                      <div key={i} className="flex items-center gap-3 px-5 py-2.5 hover:bg-gray-50/50 transition-colors">
+                        <div className={`w-2 h-2 rounded-full flex-shrink-0 ${pt.alertType === 'fall' ? 'bg-red-500 animate-pulse' : 'bg-emerald-400'}`} />
+                        <span className="text-[11px] text-gray-400 font-mono flex-shrink-0 w-[70px]">
+                          {new Date(pt.recordedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                        </span>
+                        <span className="text-[11px] text-gray-500 font-mono truncate">
+                          {pt.lat.toFixed(5)}, {pt.lon.toFixed(5)}
+                        </span>
                         {pt.battery !== undefined && (
-                          <span style={{ fontSize: '11px', color: pt.battery <= 20 ? '#EF4444' : '#60C10F', fontWeight: 700, marginRight: 'auto' }}>🔋{pt.battery}%</span>
+                          <span className={`text-[11px] font-bold ml-auto flex-shrink-0 ${pt.battery <= 20 ? 'text-red-500' : 'text-emerald-500'}`}>
+                            🔋 {pt.battery}%
+                          </span>
                         )}
                       </div>
                     ))}
@@ -385,93 +369,149 @@ export default function TrackingHistoryPage() {
           </div>
         )}
 
-        {/* ── Tab: Geofences ─────────────────────────────────────────── */}
+        {/* ══════════════════════════════════════════════════════════
+            TAB: GEOFENCES
+           ══════════════════════════════════════════════════════════ */}
         {activeTab === 'geofences' && (
-          <div style={{ paddingTop: '20px', paddingBottom: '40px' }}>
+          <div className="space-y-4">
+
+            {/* Map with all geofences + click to place */}
+            <div className="rounded-2xl overflow-hidden border border-gray-200 shadow-lg" style={{ height: showCreate ? '320px' : '260px' }}>
+              <DynamicMap
+                center={fenceCenter || mapCenter}
+                markers={fenceCenter ? [{ position: fenceCenter, label: fenceName || 'New geofence' }] : []}
+                zoom={13}
+                scrollWheelZoom={true}
+                showControls={true}
+                circles={fenceCircles}
+                onMapClick={showCreate ? (lat, lon) => setFenceCenter([lat, lon]) : undefined}
+              />
+            </div>
+
             {/* Create button */}
             <button
-              onClick={() => setShowCreateFence(!showCreateFence)}
-              style={{ width: '100%', padding: '14px', borderRadius: '14px', border: '2px dashed rgba(96,193,15,0.4)', background: 'rgba(96,193,15,0.06)', color: '#60C10F', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontWeight: 700, fontSize: '14px', marginBottom: '16px', transition: 'all 0.2s' }}
+              onClick={() => { setShowCreate(!showCreate); if (showCreate) setFenceCenter(null); }}
+              className={`w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl font-bold text-sm transition-all duration-200 ${
+                showCreate
+                  ? 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                  : 'bg-gradient-to-r from-[#014CB3] to-[#60C10F] text-white shadow-lg hover:shadow-xl hover:scale-[1.01]'
+              }`}
             >
-              <Plus style={{ width: '18px', height: '18px' }} />
-              {showCreateFence ? 'إلغاء' : 'إنشاء نطاق جغرافي جديد'}
+              <Plus className="w-4 h-4" />
+              {showCreate ? 'Cancel' : 'Create New Geofence'}
             </button>
 
             {/* Create form */}
-            {showCreateFence && (
-              <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '18px', border: '1px solid rgba(96,193,15,0.2)', padding: '20px', marginBottom: '20px' }}>
-                <p style={{ fontWeight: 800, fontSize: '15px', marginBottom: '16px', color: '#60C10F' }}>🛡️ نطاق جغرافي جديد</p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <FenceInput label="اسم النطاق" placeholder="مثال: المنزل، المدرسة..." value={newFence.name} onChange={(v) => setNewFence({ ...newFence, name: v })} />
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                    <FenceInput label="خط العرض (Lat)" placeholder="30.0444" value={newFence.lat} onChange={(v) => setNewFence({ ...newFence, lat: v })} type="number" />
-                    <FenceInput label="خط الطول (Lon)" placeholder="31.2357" value={newFence.lon} onChange={(v) => setNewFence({ ...newFence, lon: v })} type="number" />
-                  </div>
-                  <FenceInput label="نصف القطر (متر)" placeholder="200" value={newFence.radiusMeters} onChange={(v) => setNewFence({ ...newFence, radiusMeters: v })} type="number" />
-
-                  <div style={{ display: 'flex', gap: '12px' }}>
-                    <ToggleField label="تنبيه عند الدخول" value={newFence.alertOnEnter} onChange={(v) => setNewFence({ ...newFence, alertOnEnter: v })} />
-                    <ToggleField label="تنبيه عند الخروج" value={newFence.alertOnExit} onChange={(v) => setNewFence({ ...newFence, alertOnExit: v })} />
-                  </div>
-
-                  <button
-                    onClick={handleCreateFence}
-                    disabled={saving}
-                    style={{ padding: '14px', borderRadius: '12px', border: 'none', background: 'linear-gradient(135deg, #014CB3, #60C10F)', color: '#fff', fontWeight: 800, fontSize: '14px', cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1 }}
-                  >
-                    {saving ? 'جاري الحفظ...' : '✅ حفظ النطاق'}
-                  </button>
+            {showCreate && (
+              <div className="bg-white rounded-2xl border border-blue-100 shadow-sm p-5 space-y-4">
+                <div className="flex items-center gap-2">
+                  <Shield className="w-4 h-4 text-[#014CB3]" />
+                  <p className="font-black text-sm text-gray-800">New Geofence</p>
                 </div>
+
+                {/* Instructions */}
+                <div className="bg-blue-50 rounded-xl px-4 py-3 text-xs text-blue-700 font-medium leading-relaxed">
+                  👆 <strong>Click on the map above</strong> to set the geofence center point. A yellow circle will appear showing the boundary.
+                </div>
+
+                {fenceCenter && (
+                  <p className="text-xs font-mono text-gray-400">
+                    📍 Center: {fenceCenter[0].toFixed(5)}, {fenceCenter[1].toFixed(5)}
+                  </p>
+                )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <label className="space-y-1.5">
+                    <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wide">Name</span>
+                    <input
+                      type="text"
+                      placeholder="e.g. Home, School, Office..."
+                      value={fenceName}
+                      onChange={(e) => setFenceName(e.target.value)}
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm text-gray-800 font-medium placeholder:text-gray-300 focus:outline-none focus:ring-2 focus:ring-[#014CB3]/20 focus:border-[#014CB3]"
+                    />
+                  </label>
+                  <label className="space-y-1.5">
+                    <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wide">Radius (meters)</span>
+                    <input
+                      type="number"
+                      placeholder="200"
+                      value={fenceRadius}
+                      onChange={(e) => setFenceRadius(e.target.value)}
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm text-gray-800 font-medium placeholder:text-gray-300 focus:outline-none focus:ring-2 focus:ring-[#014CB3]/20 focus:border-[#014CB3]"
+                    />
+                  </label>
+                </div>
+
+                <div className="flex gap-3">
+                  <ToggleButton label="Alert on enter" active={alertEnter} onClick={() => setAlertEnter(!alertEnter)} />
+                  <ToggleButton label="Alert on exit" active={alertExit} onClick={() => setAlertExit(!alertExit)} />
+                </div>
+
+                <button
+                  onClick={createFence}
+                  disabled={saving || !fenceCenter}
+                  className="w-full py-3 rounded-xl font-bold text-sm bg-[#014CB3] text-white hover:bg-[#014CB3]/90 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-md"
+                >
+                  {saving ? 'Saving...' : '✓ Save Geofence'}
+                </button>
               </div>
             )}
 
             {/* Geofences list */}
             {geoLoading ? (
-              <div style={{ textAlign: 'center', padding: '40px 0', color: 'rgba(255,255,255,0.4)' }}>
-                <Shield style={{ width: '28px', height: '28px', margin: '0 auto 12px', animation: 'pulse 1.5s infinite' }} />
-                <p>جاري التحميل...</p>
-              </div>
-            ) : geofences.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '60px 20px' }}>
-                <Shield style={{ width: '40px', height: '40px', margin: '0 auto 12px', color: 'rgba(255,255,255,0.2)' }} />
-                <p style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>لا توجد نطاقات جغرافية بعد</p>
-                <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '13px', marginTop: '8px' }}>أنشئ نطاقاً لتلقي تنبيهات عند الدخول أو الخروج منه</p>
-              </div>
+              <LoadingState label="Loading geofences..." />
+            ) : geofences.length === 0 && !showCreate ? (
+              <EmptyState icon={Shield} title="No geofences yet" subtitle="Create a virtual boundary to receive alerts when the device enters or leaves an area." />
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {geofences.map((fence) => (
-                  <div key={fence.id} style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '18px', border: `1px solid ${fence.isActive ? 'rgba(96,193,15,0.25)' : 'rgba(255,255,255,0.08)'}`, padding: '16px' }}>
-                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                          <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: fence.isActive ? '#60C10F' : 'rgba(255,255,255,0.3)', flexShrink: 0, ...(fence.isActive ? { animation: 'pulse 2s infinite' } : {}) }} />
-                          <p style={{ fontWeight: 800, fontSize: '15px', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fence.name}</p>
-                        </div>
-                        <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.45)', margin: '0 0 8px', fontFamily: 'monospace' }}>
-                          {fence.lat.toFixed(5)}, {fence.lon.toFixed(5)} • نصف القطر: {fence.radiusMeters}م
+              <div className="space-y-3">
+                {geofences.map((f) => (
+                  <div key={f.id} className={`bg-white rounded-2xl border shadow-sm overflow-hidden transition-all ${
+                    f.isActive ? 'border-emerald-200' : 'border-gray-100 opacity-70'
+                  }`}>
+                    <div className="p-4 flex items-start gap-3">
+                      {/* Status dot */}
+                      <div className="mt-1 flex-shrink-0">
+                        <div className={`w-3 h-3 rounded-full ${
+                          f.isActive ? 'bg-emerald-400 shadow-[0_0_8px_rgba(96,193,15,0.4)]' : 'bg-gray-300'
+                        }`} style={f.isActive ? { animation: 'pulse 2.5s ease-in-out infinite' } : {}} />
+                      </div>
+
+                      {/* Content */}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-black text-sm text-gray-800 truncate">{f.name}</p>
+                        <p className="text-[11px] text-gray-400 font-mono mt-0.5">
+                          {f.lat.toFixed(5)}, {f.lon.toFixed(5)} · {f.radiusMeters}m radius
                         </p>
-                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                          {fence.alertOnEnter && <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '99px', background: 'rgba(96,193,15,0.15)', color: '#60C10F', border: '1px solid rgba(96,193,15,0.3)', fontWeight: 700 }}>📍 تنبيه عند الدخول</span>}
-                          {fence.alertOnExit && <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '99px', background: 'rgba(239,68,68,0.15)', color: '#F87171', border: '1px solid rgba(239,68,68,0.3)', fontWeight: 700 }}>🚪 تنبيه عند الخروج</span>}
-                          {fence.lastState && fence.lastState !== 'unknown' && (
-                            <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '99px', background: fence.lastState === 'inside' ? 'rgba(96,193,15,0.2)' : 'rgba(255,255,255,0.08)', color: fence.lastState === 'inside' ? '#60C10F' : 'rgba(255,255,255,0.5)', fontWeight: 700 }}>
-                              {fence.lastState === 'inside' ? '✅ داخل النطاق' : '⭕ خارج النطاق'}
-                            </span>
+                        <div className="flex gap-1.5 mt-2 flex-wrap">
+                          {f.alertOnEnter && <Badge text="📍 Enter" color="emerald" />}
+                          {f.alertOnExit && <Badge text="🚪 Exit" color="red" />}
+                          {f.lastState && f.lastState !== 'unknown' && (
+                            <Badge
+                              text={f.lastState === 'inside' ? '✓ Inside' : '○ Outside'}
+                              color={f.lastState === 'inside' ? 'blue' : 'gray'}
+                            />
                           )}
                         </div>
                       </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flexShrink: 0 }}>
+
+                      {/* Actions */}
+                      <div className="flex flex-col gap-1.5 flex-shrink-0">
                         <button
-                          onClick={() => handleToggleFence(fence)}
-                          style={{ padding: '6px 12px', borderRadius: '8px', border: 'none', cursor: 'pointer', background: fence.isActive ? 'rgba(96,193,15,0.15)' : 'rgba(255,255,255,0.08)', color: fence.isActive ? '#60C10F' : 'rgba(255,255,255,0.4)', fontSize: '12px', fontWeight: 700 }}
+                          onClick={() => toggleFence(f)}
+                          className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-colors ${
+                            f.isActive
+                              ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
+                              : 'bg-gray-50 text-gray-400 hover:bg-gray-100'
+                          }`}
                         >
-                          {fence.isActive ? '✅ مفعّل' : '⏸ معطّل'}
+                          {f.isActive ? <><Eye className="w-3 h-3 inline mr-1" />On</> : <><EyeOff className="w-3 h-3 inline mr-1" />Off</>}
                         </button>
                         <button
-                          onClick={() => handleDeleteFence(fence.id)}
-                          style={{ padding: '6px 12px', borderRadius: '8px', border: 'none', cursor: 'pointer', background: 'rgba(239,68,68,0.1)', color: '#F87171', fontSize: '12px', fontWeight: 700 }}
+                          onClick={() => deleteFence(f.id)}
+                          className="px-3 py-1.5 rounded-lg text-[11px] font-bold bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-600 transition-colors"
                         >
-                          🗑️ حذف
+                          <Trash2 className="w-3 h-3 inline mr-1" />Del
                         </button>
                       </div>
                     </div>
@@ -481,92 +521,124 @@ export default function TrackingHistoryPage() {
             )}
           </div>
         )}
-      </div>
+      </main>
 
       <style>{`
         @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.5; } }
-        @keyframes slideDown { from { transform:translateY(-20px); opacity:0; } to { transform:translateY(0); opacity:1; } }
-        input[type=date]::-webkit-calendar-picker-indicator { filter: invert(1); }
+        @keyframes slideDown { from { transform:translateX(-50%) translateY(-16px); opacity:0; } to { transform:translateX(-50%) translateY(0); opacity:1; } }
       `}</style>
     </div>
   );
 }
 
-// ── Sub-components ────────────────────────────────────────────────
+// ── Sub Components ────────────────────────────────────────────────
 
-function StatCard({ icon, label, value, color }: { icon: React.ReactNode; label: string; value: string; color: string }) {
+function StatCard({ icon: Icon, label, value, color }: { icon: React.ElementType; label: string; value: string; color: string }) {
   return (
-    <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.08)', padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-      <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: `${color}22`, display: 'flex', alignItems: 'center', justifyContent: 'center', color }}>
-        {icon}
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex flex-col gap-2">
+      <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: `${color}12` }}>
+        <Icon className="w-4 h-4" style={{ color }} />
       </div>
-      <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', margin: 0, fontWeight: 600 }}>{label}</p>
-      <p style={{ fontSize: '20px', fontWeight: 900, margin: 0, color }}>{value}</p>
+      <p className="text-[10px] font-bold text-gray-300 uppercase tracking-wider">{label}</p>
+      <p className="text-lg sm:text-xl font-black" style={{ color }}>{value}</p>
     </div>
   );
 }
 
-function InfoRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+function DetailCell({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+    <div className="bg-white p-4 flex items-center gap-3">
       {icon}
       <div>
-        <p style={{ fontSize: '10px', color: 'rgba(255,255,255,0.35)', margin: 0, fontWeight: 600 }}>{label}</p>
-        <p style={{ fontSize: '13px', fontWeight: 800, margin: 0 }}>{value}</p>
+        <p className="text-[10px] font-bold text-gray-300 uppercase tracking-wider">{label}</p>
+        <p className="text-sm font-black text-gray-800 mt-0.5">{value}</p>
       </div>
     </div>
   );
 }
 
-function FenceInput({ label, placeholder, value, onChange, type = 'text' }: { label: string; placeholder: string; value: string; onChange: (v: string) => void; type?: string }) {
-  return (
-    <div>
-      <label style={{ fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.5)', display: 'block', marginBottom: '6px' }}>{label}</label>
-      <input
-        type={type}
-        placeholder={placeholder}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        style={{ width: '100%', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '10px', padding: '10px 12px', color: '#fff', fontSize: '14px', fontFamily: 'inherit', boxSizing: 'border-box', direction: type === 'number' ? 'ltr' : 'rtl' }}
-      />
-    </div>
-  );
-}
-
-function ToggleField({ label, value, onChange }: { label: string; value: boolean; onChange: (v: boolean) => void }) {
+function ToggleButton({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
   return (
     <button
-      onClick={() => onChange(!value)}
-      style={{ flex: 1, padding: '10px 12px', borderRadius: '10px', border: `1px solid ${value ? 'rgba(96,193,15,0.3)' : 'rgba(255,255,255,0.1)'}`, background: value ? 'rgba(96,193,15,0.1)' : 'rgba(255,255,255,0.04)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', color: value ? '#60C10F' : 'rgba(255,255,255,0.4)', fontWeight: 700, fontSize: '12px' }}
+      onClick={onClick}
+      className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-bold border transition-all ${
+        active
+          ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
+          : 'border-gray-200 bg-gray-50 text-gray-400'
+      }`}
     >
-      {value ? <ToggleRight style={{ width: '16px', height: '16px' }} /> : <ToggleLeft style={{ width: '16px', height: '16px' }} />}
-      {label}
+      {active ? '✓ ' : ''}{label}
     </button>
   );
 }
 
-function WeekChart({ data, selectedDate, onSelectDate }: { data: { date: string; distanceKm: number; points: number; activeMinutes: number }[]; selectedDate: string; onSelectDate: (d: string) => void }) {
+function Badge({ text, color }: { text: string; color: string }) {
+  const colorMap: Record<string, string> = {
+    emerald: 'bg-emerald-50 text-emerald-600 border-emerald-200',
+    red: 'bg-red-50 text-red-500 border-red-200',
+    blue: 'bg-blue-50 text-blue-600 border-blue-200',
+    gray: 'bg-gray-50 text-gray-500 border-gray-200',
+  };
+  return (
+    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${colorMap[color] || colorMap.gray}`}>
+      {text}
+    </span>
+  );
+}
+
+function LoadingState({ label }: { label: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-20 text-gray-300">
+      <Activity className="w-8 h-8 mb-3 animate-spin" />
+      <p className="text-sm font-semibold">{label}</p>
+    </div>
+  );
+}
+
+function EmptyState({ icon: Icon, title, subtitle }: { icon: React.ElementType; title: string; subtitle: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-20 text-center px-6">
+      <div className="w-16 h-16 rounded-2xl bg-gray-50 flex items-center justify-center mb-4">
+        <Icon className="w-7 h-7 text-gray-200" />
+      </div>
+      <p className="text-sm font-bold text-gray-400">{title}</p>
+      <p className="text-xs text-gray-300 mt-1.5 max-w-xs">{subtitle}</p>
+    </div>
+  );
+}
+
+function WeekChart({ data, selectedDate, onSelect }: { data: { date: string; distanceKm: number; points: number }[]; selectedDate: string; onSelect: (d: string) => void }) {
   const maxDist = Math.max(...data.map((d) => d.distanceKm), 0.1);
   const sorted = [...data].reverse();
 
   return (
-    <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end', height: '100px' }}>
+    <div className="flex gap-2 items-end" style={{ height: '120px' }}>
       {sorted.map((day) => {
-        const height = Math.max((day.distanceKm / maxDist) * 80, day.points > 0 ? 6 : 0);
-        const isSelected = day.date === selectedDate;
+        const pct = Math.max((day.distanceKm / maxDist) * 90, day.points > 0 ? 8 : 2);
+        const sel = day.date === selectedDate;
         return (
-          <div
+          <button
             key={day.date}
-            onClick={() => onSelectDate(day.date)}
-            style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', cursor: 'pointer' }}
+            onClick={() => onSelect(day.date)}
+            className="flex-1 flex flex-col items-center gap-1 group"
           >
-            <div style={{ width: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', height: '80px' }}>
-              <div style={{ width: '100%', height: `${height}px`, borderRadius: '6px 6px 0 0', background: isSelected ? 'linear-gradient(180deg,#60C10F,#014CB3)' : 'rgba(255,255,255,0.15)', transition: 'all 0.2s' }} />
+            <span className={`text-[9px] font-bold transition-colors ${sel ? 'text-[#014CB3]' : 'text-gray-300 group-hover:text-gray-400'}`}>
+              {day.distanceKm > 0 ? `${day.distanceKm}` : ''}
+            </span>
+            <div className="w-full flex flex-col justify-end" style={{ height: '80px' }}>
+              <div
+                className={`w-full rounded-lg transition-all duration-200 ${
+                  sel
+                    ? 'bg-gradient-to-t from-[#014CB3] to-[#60C10F]'
+                    : 'bg-gray-100 group-hover:bg-gray-200'
+                }`}
+                style={{ height: `${pct}%`, minHeight: '3px' }}
+              />
             </div>
-            <p style={{ fontSize: '9px', color: isSelected ? '#60C10F' : 'rgba(255,255,255,0.3)', margin: 0, fontWeight: isSelected ? 800 : 500 }}>
-              {new Date(day.date + 'T00:00:00').toLocaleDateString('ar-EG', { weekday: 'narrow' })}
-            </p>
-          </div>
+            <span className={`text-[9px] font-bold ${sel ? 'text-[#014CB3]' : 'text-gray-300'}`}>
+              {new Date(day.date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'narrow' })}
+            </span>
+          </button>
         );
       })}
     </div>

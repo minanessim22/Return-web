@@ -245,13 +245,16 @@ function GPSPageContent() {
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
-            <button onClick={() => void loadData(selectedId)} className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/10 px-5 py-3 font-bold transition hover:bg-white/20">
-              <RefreshCw className="h-4 w-4" /> Refresh devices
-            </button>
-            <button onClick={handleCreateNew} className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-3 font-black text-[#014CB3] shadow-lg">
-              <Plus className="h-4 w-4" /> New GPS tracker
-            </button>
-          </div>
+              <button onClick={() => void loadData(selectedId)} className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/10 px-5 py-3 font-bold transition hover:bg-white/20">
+                <RefreshCw className="h-4 w-4" /> Refresh devices
+              </button>
+              <button onClick={handleCreateNew} className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-3 font-black text-[#014CB3] shadow-lg">
+                <Plus className="h-4 w-4" /> New GPS tracker
+              </button>
+              <Link href="/tracking/history" className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-[#60C10F] to-[#014CB3] px-5 py-3 font-black text-white shadow-lg hover:shadow-xl transition">
+                <Route className="h-4 w-4" /> History & Geofencing
+              </Link>
+            </div>
         </div>
 
         {message ? <div className="mb-5 rounded-[1.5rem] bg-emerald-50 px-5 py-4 text-sm font-semibold text-emerald-700">{message}</div> : null}

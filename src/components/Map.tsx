@@ -1,6 +1,6 @@
 'use client';
 
-import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, Circle, useMap, useMapEvents } from 'react-leaflet';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
@@ -585,6 +585,26 @@ function TrailPolyline({ trail }: { trail: [number, number][] }) {
 
 // ── Map – main exported component ────────────────────────────────
 
+// ── CircleOverlay – renders geofence circles on the map ──────────
+
+export type CircleOverlay = {
+  center: [number, number];
+  radiusMeters: number;
+  color?: string;
+  label?: string;
+};
+
+// ── ClickHandler – captures map clicks ───────────────────────────
+
+function ClickHandler({ onClick }: { onClick?: (lat: number, lon: number) => void }) {
+  useMapEvents({
+    click(e) {
+      if (onClick) onClick(e.latlng.lat, e.latlng.lng);
+    },
+  });
+  return null;
+}
+
 type Props = {
   center?: [number, number];
   marker?: [number, number];
@@ -610,6 +630,10 @@ type Props = {
    * recent movement path. Rendered as a semi-transparent breadcrumb trail.
    */
   trail?: [number, number][];
+  /** Callback when the user clicks on the map */
+  onMapClick?: (lat: number, lon: number) => void;
+  /** Circles to render (e.g. geofence boundaries) */
+  circles?: CircleOverlay[];
 };
 
 export default function Map({
@@ -622,6 +646,8 @@ export default function Map({
   scrollWheelZoom = false,
   deviceCenter,
   trail,
+  onMapClick,
+  circles,
 }: Props) {
   const [mounted, setMounted] = useState(false);
 
@@ -692,6 +718,24 @@ export default function Map({
         <MapViewport center={center} markers={effectiveMarkers} zoom={zoom} />
         <MapControls showControls={showControls} deviceCenter={deviceCenter ?? (effectiveMarkers[0]?.position)} />
         {trail && trail.length >= 2 && <TrailPolyline trail={trail} />}
+        {onMapClick && <ClickHandler onClick={onMapClick} />}
+        {circles && circles.map((c, i) => (
+          <Circle
+            key={`circle-${i}-${c.center[0]}-${c.center[1]}`}
+            center={c.center}
+            radius={c.radiusMeters}
+            pathOptions={{
+              color: c.color || '#014CB3',
+              fillColor: c.color || '#014CB3',
+              fillOpacity: 0.12,
+              weight: 2,
+              opacity: 0.6,
+              dashArray: '6 4',
+            }}
+          >
+            {c.label && <Popup>{c.label}</Popup>}
+          </Circle>
+        ))}
         <TileLayer
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
