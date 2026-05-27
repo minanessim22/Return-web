@@ -247,14 +247,14 @@ export function DevicesManagementPanel({ isRTL = false }: { isRTL?: boolean }) {
 
   const linkedProfilesCount = useMemo(() => devices.filter((item) => item.linkedProfileId).length, [devices]);
   const activeDevicesCount = useMemo(() => devices.filter((item) => item.status === 'ACTIVE').length, [devices]);
-  const gpsDevices = useMemo(() => devices.filter((device) => device.type === 'GPS' || device.supportsGps), [devices]);
-  const selectedHistoryDevice = useMemo(() => gpsDevices.find((device) => device.id === historyDeviceId) ?? null, [gpsDevices, historyDeviceId]);
+  const gpsCapableDevices = useMemo(() => devices.filter((device) => device.type === 'GPS' || device.supportsGps), [devices]);
+  const selectedHistoryDevice = useMemo(() => gpsCapableDevices.find((device) => device.id === historyDeviceId) ?? null, [gpsCapableDevices, historyDeviceId]);
 
   useEffect(() => {
-    if (historyDeviceId && !gpsDevices.some((device) => device.id === historyDeviceId)) {
+    if (historyDeviceId && !gpsCapableDevices.some((device) => device.id === historyDeviceId)) {
       setHistoryDeviceId('');
     }
-  }, [gpsDevices, historyDeviceId]);
+  }, [gpsCapableDevices, historyDeviceId]);
 
 
 
@@ -495,11 +495,11 @@ export function DevicesManagementPanel({ isRTL = false }: { isRTL?: boolean }) {
             <select
               value={historyDeviceId}
               onChange={(event) => setHistoryDeviceId(event.target.value)}
-              disabled={loading || gpsDevices.length === 0}
+              disabled={loading || gpsCapableDevices.length === 0}
               className="w-full rounded-2xl bg-white/90 text-slate-900 px-4 py-3 outline-none disabled:opacity-60"
             >
               <option value="">{t.historySelectPlaceholder}</option>
-              {gpsDevices.map((device) => (
+              {gpsCapableDevices.map((device) => (
                 <option key={device.id} value={device.id}>
                   {device.label} · {device.serialNumber}
                 </option>
@@ -510,7 +510,7 @@ export function DevicesManagementPanel({ isRTL = false }: { isRTL?: boolean }) {
 
         {loading ? (
           <div className="h-44 rounded-2xl border border-white/15 bg-white/10 animate-pulse" />
-        ) : gpsDevices.length === 0 ? (
+        ) : gpsCapableDevices.length === 0 ? (
           <div className="rounded-2xl border border-white/15 bg-white/5 px-4 py-6 text-sm text-white/70">
             {t.historyNoGps}
           </div>
