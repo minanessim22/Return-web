@@ -236,10 +236,9 @@ export async function GET(request: Request) {
 
   if (!deviceId) return new Response('device_id required', { status: 400 });
 
-  // ── Pre-Registration check ─────────────────────────────────────
+  // ── Registration check (non-blocking) ───────────────────────────
   if (!await isTrackerRegistered(deviceId)) {
-    console.warn(`[REPORT GET] REJECTED unregistered device: ${deviceId}`);
-    return new Response('Unauthorized device', { status: 401 });
+    console.warn(`[REPORT GET] Unregistered device: ${deviceId}`);
   }
 
   const raw: RawPoint = {
@@ -296,10 +295,9 @@ export async function POST(request: Request) {
 
   if (!deviceId) return new Response('device_id required', { status: 400 });
 
-  // ── Pre-Registration check ─────────────────────────────────────
+  // ── Registration check (non-blocking) ───────────────────────────
   if (!await isTrackerRegistered(deviceId)) {
-    console.warn(`[REPORT POST] REJECTED unregistered device: ${deviceId}`);
-    return new Response('Unauthorized device', { status: 401 });
+    console.warn(`[REPORT POST] Unregistered device: ${deviceId}`);
   }
 
   // ── Batch mode: { device_id, locations: [...] } ───────────────

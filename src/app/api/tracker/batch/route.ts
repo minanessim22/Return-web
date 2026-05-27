@@ -128,10 +128,9 @@ export async function POST(request: Request) {
     return Response.json({ error: 'device_id required' }, { status: 400 });
   }
 
-  // ── Pre-Registration check ─────────────────────────────────────
+  // ── Registration check (non-blocking) ───────────────────────────
   if (!await isTrackerRegistered(deviceId)) {
-    console.warn(`[BATCH] REJECTED unregistered device: ${deviceId}`);
-    return Response.json({ error: 'Unauthorized device' }, { status: 401 });
+    console.warn(`[BATCH] Unregistered device: ${deviceId}`);
   }
 
   if (!Array.isArray(body.locations) || body.locations.length === 0) {
