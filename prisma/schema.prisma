@@ -292,6 +292,37 @@ model GpsLocation {
   @@map("gps_locations")
 }
 
+// ── LocationHistory ────────────────────────────────────────────────
+// Stores every GPS ping received from any source (A9G board, Colota app,
+// MQTT, batch upload).  Uses a raw string deviceId — no FK required —
+// so anonymous devices work without prior registration.
+model LocationHistory {
+  id         String   @id @default(uuid()) @db.Uuid
+  /// Raw device identifier — matches device_id sent by A9G or Colota
+  deviceId   String   @map("device_id")
+  lat        Float
+  lon        Float
+  battery    Int?
+  altitude   Float?
+  speed      Float?
+  /// GPS accuracy radius in metres (Colota "acc" field)
+  accuracy   Float?
+  /// Compass bearing 0-360° (Colota "bear" field)
+  bearing    Float?
+  /// "location" | "fall" | "sos"
+  alertType  String   @default("location") @map("alert_type")
+  /// "http" | "mqtt" | "colota" | "batch"
+  source     String   @default("http")
+  /// Actual GPS timestamp (from device). Falls back to receivedAt.
+  recordedAt DateTime @map("recorded_at")
+  /// Server arrival time — always set by backend
+  receivedAt DateTime @default(now()) @map("received_at")
+
+  @@index([deviceId, recordedAt])
+  @@index([recordedAt])
+  @@map("location_history")
+}
+
 model ScanEvent {
   id        String                 @id @default(uuid()) @db.Uuid
   profileId String?                @map("profile_id") @db.Uuid

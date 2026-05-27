@@ -46,7 +46,16 @@ export async function GET() {
             encoder.encode(`event: location\ndata: ${JSON.stringify(event)}\n\n`)
           );
         } catch {
-          // Client disconnected
+          cleanup();
+        }
+      };
+
+      const onFallAlert = (event: TrackerLocationEvent) => {
+        try {
+          controller.enqueue(
+            encoder.encode(`event: fall_alert\ndata: ${JSON.stringify(event)}\n\n`)
+          );
+        } catch {
           cleanup();
         }
       };
@@ -54,12 +63,13 @@ export async function GET() {
       const cleanup = () => {
         clearInterval(heartbeat);
         emitter.removeListener('location', onLocation);
+        emitter.removeListener('fall_alert', onFallAlert);
       };
 
       emitter.on('location', onLocation);
+      emitter.on('fall_alert', onFallAlert);
 
       // If the stream is cancelled (browser closed the tab) clean up
-      // This is handled via the cancel() callback below
       (controller as any).__cleanup = cleanup;
     },
 

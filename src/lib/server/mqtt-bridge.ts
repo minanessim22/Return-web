@@ -2,12 +2,12 @@
  * mqtt-bridge.ts
  * ─────────────────────────────────────────────────────────────────────
  * Singleton MQTT subscriber that:
- *   1. Connects to the configured MQTT broker (e.g. HiveMQ public).
- *   2. Subscribes to   return/tracker/+/location
- *   3. On every valid GPS message it:
- *        – Persists the location to the matching device in the store.
- *        – Emits a "location" event so active SSE connections can push
- *          the update to the browser in real time.
+ * 1. Connects to the configured MQTT broker (e.g. HiveMQ public).
+ * 2. Subscribes to   return/tracker/+/location (and report)
+ * 3. On every valid GPS message it:
+ * – Persists the location to the matching device in the store.
+ * – Emits a "location" event so active SSE connections can push
+ * the update to the browser in real time.
  * ─────────────────────────────────────────────────────────────────────
  */
 
@@ -19,24 +19,26 @@ import { addDeviceLocation, createNotification, readStore, updateStore } from '@
 
 export interface TrackerLocationPayload {
   device_id: string;
-  lat: number;
-  lon: number;
+  lat: number | null;
+  lon: number | null;
   battery?: number;
   timestamp?: string;
+  type?: string; // التعديل: إضافة نوع التنبيه
 }
 
 export interface TrackerLocationEvent extends TrackerLocationPayload {
   receivedAt: string;
   topic: string;
+  alertType?: string; // التعديل: لتوافق الـ SSE
 }
 
 /* ── Configuration ── */
 
 const MQTT_BROKER_URL = process.env.MQTT_BROKER_URL || 'wss://broker.hivemq.com:8884/mqtt';
-const MQTT_TOPIC      = process.env.MQTT_TOPIC      || 'return/tracker/+/location';
-const MQTT_CLIENT_ID  = process.env.MQTT_CLIENT_ID   || `return-server-${Date.now()}`;
-const MQTT_USERNAME   = process.env.MQTT_USERNAME     || undefined;
-const MQTT_PASSWORD   = process.env.MQTT_PASSWORD     || undefined;
+const MQTT_TOPIC = process.env.MQTT_TOPIC || 'return/tracker/+/report'; // عدلناها لـ report عشان تمشي مع الكود بتاع البوردة
+const MQTT_CLIENT_ID = process.env.MQTT_CLIENT_ID || `return-server`;
+const MQTT_USERNAME = process.env.MQTT_USERNAME || undefined;
+const MQTT_PASSWORD = process.env.MQTT_PASSWORD || undefined;
 
 /* ── Globals (process-level singleton) ── */
 
@@ -70,10 +72,13 @@ function getGlobal(): MqttBridgeGlobal {
 function parsePayload(raw: Buffer, topic: string): TrackerLocationPayload | null {
   try {
     const json = JSON.parse(raw.toString('utf-8'));
-    const lat = Number(json.lat ?? json.latitude);
-    const lon = Number(json.lon ?? json.longitude ?? json.lng);
+    // السماح للـ null في حالة الـ Fall Alert بدون GPS
+    const lat = json.lat === null ? null : Number(json.lat ?? json.latitude);
+    const lon = json.lon === null ? null : Number(json.lon ?? json.longitude ?? json.lng);
     const device_id = String(json.device_id ?? json.deviceId ?? '').trim();
-    if (!device_id || !Number.isFinite(lat) || !Number.isFinite(lon)) {
+    const type = json.type ? String(json.type).trim() : 'location'; // التعديل: استخراج النوع
+
+    if (!device_id || (lat !== null && !Number.isFinite(lat)) || (lon !== null && !Number.isFinite(lon))) {
       return null;
     }
     return {
@@ -82,6 +87,7 @@ function parsePayload(raw: Buffer, topic: string): TrackerLocationPayload | null
       lon,
       battery: Number.isFinite(Number(json.battery)) ? Number(json.battery) : undefined,
       timestamp: json.timestamp ? String(json.timestamp) : undefined,
+      type, // التعديل: إرجاع النوع
     };
   } catch {
     console.warn('[MQTT] Invalid JSON payload on topic', topic);
@@ -138,22 +144,28 @@ async function persistLocation(payload: TrackerLocationPayload): Promise<boolean
       draftDevice.updatedAt = now;
 
       // Add location record
-      addDeviceLocation(draft, draftDevice.id, {
-        latitude: payload.lat,
-        longitude: payload.lon,
-        source: 'mqtt_a9g',
-      });
+      if (payload.lat !== null && payload.lon !== null) {
+        addDeviceLocation(draft, draftDevice.id, {
+          latitude: payload.lat,
+          longitude: payload.lon,
+          source: 'mqtt_a9g',
+        });
+      }
 
       // Notify the device owner
       if (draftDevice.linkedProfileId) {
         const profile = draft.identificationProfiles.find((p) => p.id === draftDevice.linkedProfileId);
         if (profile) {
+          // التعديل: تغيير الإشعار بناءً على نوع التنبيه
+          const isFall = payload.type === 'fall';
           createNotification(
             draft,
             profile.ownerUserId,
-            'Live GPS Update',
-            `${profile.displayName}'s wristband sent a live GPS update via MQTT.`,
-            'gps_telemetry',
+            isFall ? '🚨 URGENT: Fall Detected!' : 'Live GPS Update',
+            isFall
+              ? `${profile.displayName} may have fallen! Please check on them immediately.`
+              : `${profile.displayName}'s device sent a live GPS update via MQTT.`,
+            isFall ? 'fall_alert' : 'gps_telemetry',
             undefined,
             `/devices`
           );
@@ -176,8 +188,11 @@ function startMqttClient() {
 
   console.log(`[MQTT] Connecting to ${MQTT_BROKER_URL} …`);
 
+  // التعديل الأهم: توليد Client ID عشوائي عشان نمنع الـ Connection Flapping
+  const uniqueClientId = `${MQTT_CLIENT_ID}_${Math.random().toString(16).substring(2, 10)}`;
+
   const client = mqtt.connect(MQTT_BROKER_URL, {
-    clientId: MQTT_CLIENT_ID,
+    clientId: uniqueClientId,
     username: MQTT_USERNAME,
     password: MQTT_PASSWORD,
     reconnectPeriod: 5000,
@@ -210,7 +225,16 @@ function startMqttClient() {
       ...payload,
       receivedAt: new Date().toISOString(),
       topic,
+      alertType: payload.type, // التعديل: دمج النوع في الحدث
     };
+
+    // التعديل: إطلاق حدث السقوط لوحده لو موجود
+    if (payload.type === 'fall') {
+      console.warn(`[MQTT] 🚨 FALL ALERT RECEIVED FOR DEVICE: ${payload.device_id}`);
+      state.emitter.emit('fall_alert', event);
+    } else {
+      console.log(`[MQTT] Location update for ${payload.device_id}`);
+    }
 
     // Emit for SSE listeners
     state.emitter.emit('location', event);
@@ -240,24 +264,14 @@ function startMqttClient() {
 
 /* ── Public API ── */
 
-/**
- * Ensure the MQTT bridge is running (idempotent – safe to call many times).
- */
 export function ensureMqttBridge() {
   startMqttClient();
 }
 
-/**
- * Get the shared EventEmitter for SSE forwarding.
- * Events: "location" → TrackerLocationEvent
- */
 export function getMqttEmitter(): EventEmitter {
   return getGlobal().emitter;
 }
 
-/**
- * Status snapshot for debugging / admin UI.
- */
 export function getMqttStatus() {
   const state = getGlobal();
   return {

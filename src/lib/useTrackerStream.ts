@@ -3,10 +3,10 @@
  * ─────────────────────────────────────────────────────────────────
  * React hook that opens a Server-Sent Events connection to
  * /api/tracker/stream and returns the latest GPS location
- * events in real time.
+ * events in real time, including fall alert detection.
  *
  * Usage:
- *   const { events, latestByDevice, connected } = useTrackerStream();
+ *   const { events, latestByDevice, connected, fallAlerts } = useTrackerStream();
  * ─────────────────────────────────────────────────────────────────
  */
 
@@ -16,12 +16,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 export interface TrackerEvent {
   device_id: string;
-  lat: number;
-  lon: number;
+  lat: number | null;
+  lon: number | null;
   battery?: number;
   timestamp?: string;
   receivedAt: string;
   topic: string;
+  /** "location" | "fall" – set by /api/tracker/report */
+  alertType?: string;
 }
 
 /** Maximum events to keep in the rolling buffer */
@@ -31,6 +33,7 @@ export function useTrackerStream() {
   const [events, setEvents] = useState<TrackerEvent[]>([]);
   const [latestByDevice, setLatestByDevice] = useState<Record<string, TrackerEvent>>({});
   const [connected, setConnected] = useState(false);
+  const [fallAlerts, setFallAlerts] = useState<TrackerEvent[]>([]);
   const esRef = useRef<EventSource | null>(null);
   const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -56,6 +59,27 @@ export function useTrackerStream() {
           ...prev,
           [data.device_id]: data,
         }));
+
+        if (data.alertType === 'fall') {
+          setFallAlerts((prev) => {
+            const next = [data, ...prev];
+            return next.length > 50 ? next.slice(0, 50) : next;
+          });
+        }
+      } catch {
+        // ignore malformed events
+      }
+    });
+
+    es.addEventListener('fall_alert', (e) => {
+      try {
+        const data: TrackerEvent = JSON.parse(e.data);
+        setFallAlerts((prev) => {
+          // Avoid duplicate insertion if already added by location listener
+          if (prev.some((item) => item.receivedAt === data.receivedAt)) return prev;
+          const next = [data, ...prev];
+          return next.length > 50 ? next.slice(0, 50) : next;
+        });
       } catch {
         // ignore malformed events
       }
@@ -87,5 +111,10 @@ export function useTrackerStream() {
     };
   }, [connect]);
 
-  return { events, latestByDevice, connected };
+  /** Dismiss a specific fall alert by index */
+  const dismissFallAlert = useCallback((index: number) => {
+    setFallAlerts((prev) => prev.filter((_, i) => i !== index));
+  }, []);
+
+  return { events, latestByDevice, connected, fallAlerts, dismissFallAlert };
 }

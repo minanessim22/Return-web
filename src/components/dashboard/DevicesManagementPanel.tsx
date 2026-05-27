@@ -6,10 +6,8 @@ import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { getHardwareModelLabel } from '@/lib/device-models';
 import type { DeviceItem, IdentificationProfile } from '@/lib/shared-types';
-import dynamic from 'next/dynamic';
 import { useTrackerStream } from '@/lib/useTrackerStream';
-
-const DynamicMap = dynamic(() => import('@/components/Map'), { ssr: false });
+import { LiveTrackingMap } from '@/components/LiveTrackingMap';
 
 type DeviceDraft = {
   label: string;
@@ -93,7 +91,7 @@ export function DevicesManagementPanel({ isRTL = false }: { isRTL?: boolean }) {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
 
-  const { latestByDevice, connected: mqttConnected } = useTrackerStream();
+  useTrackerStream(); // keeps the SSE connection alive for LiveTrackingMap
 
   const t = useMemo(() => {
     return isRTL
@@ -236,24 +234,7 @@ export function DevicesManagementPanel({ isRTL = false }: { isRTL?: boolean }) {
   const linkedProfilesCount = useMemo(() => devices.filter((item) => item.linkedProfileId).length, [devices]);
   const activeDevicesCount = useMemo(() => devices.filter((item) => item.status === 'ACTIVE').length, [devices]);
 
-  const mapMarkers = useMemo(() => {
-    return devices
-      .filter((d) => d.type === 'GPS' || d.latitude !== undefined)
-      .map((d) => {
-        const live = latestByDevice[d.serialNumber || d.id];
-        const lat = live?.lat ?? toOptionalNumber(drafts[d.id]?.latitude || '') ?? d.latitude;
-        const lon = live?.lon ?? toOptionalNumber(drafts[d.id]?.longitude || '') ?? d.longitude;
-        if (lat === undefined || lon === undefined) return null;
-        return {
-          position: [lat, lon] as [number, number],
-          label: d.label,
-          battery: live?.battery ?? toOptionalNumber(drafts[d.id]?.batteryLevel || '') ?? d.batteryLevel,
-          lastSeen: live?.receivedAt ?? d.updatedAt,
-          live: !!live
-        };
-      })
-      .filter(Boolean) as any[];
-  }, [devices, drafts, latestByDevice]);
+
 
   const handleCreateDevice = async () => {
     if (!form.label.trim()) {
@@ -471,16 +452,12 @@ export function DevicesManagementPanel({ isRTL = false }: { isRTL?: boolean }) {
         ))}
       </div>
 
-      {mapMarkers.length > 0 && (
-        <div className="rounded-3xl border border-white/20 bg-white/10 overflow-hidden shadow-2xl h-[400px] relative">
-          <DynamicMap center={[30.0444, 31.2357]} zoom={11} markers={mapMarkers} animate={true} />
-          <div className="absolute top-4 left-4 z-[400]">
-            <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-black shadow-lg uppercase tracking-wider ${mqttConnected ? 'bg-[#60C10F] text-white' : 'bg-red-500 text-white'}`}>
-              <Radio className="w-3.5 h-3.5" /> {mqttConnected ? 'MQTT Connected' : 'MQTT Waiting'}
-            </span>
-          </div>
-        </div>
-      )}
+      {/* ── Live GPS Map – always visible ──────────────────────── */}
+      <LiveTrackingMap
+        height="420px"
+        showLog={true}
+        isRTL={isRTL}
+      />
 
       <div className="grid grid-cols-1 xl:grid-cols-[1.2fr_0.8fr] gap-6">
         <div className="rounded-3xl border border-white/20 bg-white/10 p-5 shadow-2xl text-white">
