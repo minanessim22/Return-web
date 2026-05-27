@@ -364,6 +364,11 @@ export async function POST(request: Request) {
   persistOne(deviceId, point, source);
   emitToSSE(deviceId, point);
 
+  // Check geofences asynchronously (non-blocking)
+  if (point.lat !== null && point.lon !== null) {
+    checkGeofences(deviceId, point.lat, point.lon!).catch(() => {});
+  }
+
   console.log(`[REPORT POST] ${point.alertType.toUpperCase()} from ${deviceId} → ${point.lat}, ${point.lon}`);
 
   return new Response('OK', { status: 200 });

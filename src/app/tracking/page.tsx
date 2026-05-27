@@ -123,17 +123,25 @@ export default function TrackingPage() {
                 Real-time tracking & fall detection for AI-Thinker A9G wristbands
               </p>
             </div>
-            <button
-              onClick={() => setSoundEnabled(!soundEnabled)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200 shadow-sm ${
-                soundEnabled
-                  ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
-                  : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-              }`}
-            >
-              {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-              {soundEnabled ? 'Sound On' : 'Sound Off'}
-            </button>
+            <div className="flex items-center gap-3 flex-wrap">
+              <a
+                href="/tracking/history"
+                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all duration-200 shadow-sm bg-gradient-to-r from-[#014CB3] to-[#60C10F] text-white hover:opacity-90"
+              >
+                📊 History & Geofencing
+              </a>
+              <button
+                onClick={() => setSoundEnabled(!soundEnabled)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200 shadow-sm ${
+                  soundEnabled
+                    ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                    : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                }`}
+              >
+                {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+                {soundEnabled ? 'Sound On' : 'Sound Off'}
+              </button>
+            </div>
           </div>
         </div>
 
