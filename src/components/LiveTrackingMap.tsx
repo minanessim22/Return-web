@@ -182,10 +182,10 @@ export function LiveTrackingMap({
     if (!deviceId || historyFetchedRef.current) return;
     historyFetchedRef.current = true;
 
-    fetch(`/api/tracker/history?device_id=${encodeURIComponent(deviceId)}&limit=50`)
+    fetch(`/api/tracker/history?device_id=${encodeURIComponent(deviceId)}&limit=${TRAIL_MAX}`)
       .then((r) => r.json())
       .then((data: { trail?: { lat: number; lon: number }[] }) => {
-        if (Array.isArray(data.trail) && data.trail.length >= 2) {
+        if (Array.isArray(data.trail) && data.trail.length > 0) {
           setTrail(data.trail.map((pt) => [pt.lat, pt.lon] as [number, number]));
         }
       })
