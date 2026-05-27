@@ -47,10 +47,23 @@ export async function GET() {
     }
   }
 
-  // Test Prisma Connection
+  // Test Prisma Connection and fetch users
+  let prismaUsersList: any[] = [];
   try {
-    const userCount = await prisma.user.count();
-    diagnostics.prisma_connection = `success (users count: ${userCount})`;
+    const dbUsers = await prisma.user.findMany({
+      select: {
+        id: true,
+        email: true,
+        username: true,
+        role: true,
+        status: true,
+        failedLoginCount: true,
+        lockedUntil: true,
+        createdAt: true,
+      }
+    });
+    prismaUsersList = dbUsers;
+    diagnostics.prisma_connection = `success (users count: ${dbUsers.length})`;
   } catch (err: any) {
     diagnostics.prisma_connection = 'failed';
     diagnostics.error = {
@@ -61,10 +74,27 @@ export async function GET() {
     };
   }
 
-  // Test Raw Store Read
+  // Test Raw Store Read and fetch store users
+  let storeUsersList: any[] = [];
   try {
     const rawStore = await readRawStoreFromSqlite();
-    diagnostics.raw_store_read = rawStore ? `success (keys: ${Object.keys(rawStore).join(', ')})` : 'returned null';
+    if (rawStore) {
+      diagnostics.raw_store_read = `success (keys: ${Object.keys(rawStore).join(', ')})`;
+      if (Array.isArray(rawStore.users)) {
+        storeUsersList = rawStore.users.map((u: any) => ({
+          id: u.id,
+          email: u.email,
+          username: u.username,
+          role: u.role,
+          status: u.status,
+          failedLoginCount: u.failedLoginCount,
+          lockedUntil: u.lockedUntil,
+          passwordHashType: u.passwordHash ? u.passwordHash.split(':')[0] : 'none',
+        }));
+      }
+    } else {
+      diagnostics.raw_store_read = 'returned null';
+    }
   } catch (err: any) {
     diagnostics.raw_store_read = 'failed: ' + err.message;
     if (!diagnostics.error) {
@@ -76,6 +106,9 @@ export async function GET() {
       };
     }
   }
+
+  diagnostics.users_in_db = prismaUsersList;
+  diagnostics.users_in_store = storeUsersList;
 
   return Response.json(diagnostics, { status: diagnostics.error ? 500 : 200 });
 }
