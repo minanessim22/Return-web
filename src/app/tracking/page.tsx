@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
-import Link from 'next/link';
 import { useTrackerStream } from '@/lib/useTrackerStream';
 
 const LiveDeviceTracker = dynamic(
@@ -124,26 +123,17 @@ export default function TrackingPage() {
                 Real-time tracking & fall detection for AI-Thinker A9G wristbands
               </p>
             </div>
-            <div className="flex items-center gap-3">
-              <Link
-                href="/tracking/history"
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#014CB3] to-[#60C10F] hover:opacity-90 text-white rounded-xl text-sm font-bold transition-all duration-200 shadow-md shadow-blue-500/10"
-              >
-                <Clock className="w-4 h-4" />
-                سجل التتبع والنطاقات (History)
-              </Link>
-              <button
-                onClick={() => setSoundEnabled(!soundEnabled)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200 shadow-sm ${
-                  soundEnabled
-                    ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
-                    : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-                }`}
-              >
-                {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-                {soundEnabled ? 'Sound On' : 'Sound Off'}
-              </button>
-            </div>
+            <button
+              onClick={() => setSoundEnabled(!soundEnabled)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200 shadow-sm ${
+                soundEnabled
+                  ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                  : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+              }`}
+            >
+              {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+              {soundEnabled ? 'Sound On' : 'Sound Off'}
+            </button>
           </div>
         </div>
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { BatteryMedium, Database, MapPin, Plus, Power, QrCode, Radio, RefreshCw, Route, Save, ShieldCheck, SmartphoneCharging, Trash2 } from 'lucide-react';
+import { BatteryMedium, Database, MapPin, Plus, Power, QrCode, Radio, RefreshCw, Save, ShieldCheck, SmartphoneCharging, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { getHardwareModelLabel } from '@/lib/device-models';
@@ -354,12 +354,6 @@ export function DevicesManagementPanel({ isRTL = false }: { isRTL?: boolean }) {
       body: t.openGps,
       icon: <MapPin className="w-7 h-7" />,
       action: () => router.push('/gps')
-    },
-    {
-      title: isRTL ? 'سجل التتبع والنطاقات' : 'History & Geofences',
-      body: isRTL ? 'مسار الحركة وجداول الإحصاء والأسوار الجغرافية' : 'View movement logs, stats, and manage geofences',
-      icon: <Route className="w-7 h-7" />,
-      action: () => router.push('/tracking/history')
     }
   ];
 
