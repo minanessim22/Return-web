@@ -251,9 +251,6 @@ function GPSPageContent() {
               <button onClick={handleCreateNew} className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-3 font-black text-[#014CB3] shadow-lg">
                 <Plus className="h-4 w-4" /> New GPS tracker
               </button>
-              <Link href="/tracking/history" className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-[#60C10F] to-[#014CB3] px-5 py-3 font-black text-white shadow-lg hover:shadow-xl transition">
-                <Route className="h-4 w-4" /> History & Geofencing
-              </Link>
             </div>
         </div>
 

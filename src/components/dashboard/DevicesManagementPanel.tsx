@@ -8,6 +8,7 @@ import { getHardwareModelLabel } from '@/lib/device-models';
 import type { DeviceItem, IdentificationProfile } from '@/lib/shared-types';
 import { useTrackerStream } from '@/lib/useTrackerStream';
 import { LiveTrackingMap } from '@/components/LiveTrackingMap';
+import { TrackingHistoryPanel } from '@/components/tracking/TrackingHistoryPanel';
 
 type DeviceDraft = {
   label: string;
@@ -90,6 +91,7 @@ export function DevicesManagementPanel({ isRTL = false }: { isRTL?: boolean }) {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  const [historyDeviceId, setHistoryDeviceId] = useState('');
 
   useTrackerStream(); // keeps the SSE connection alive for LiveTrackingMap
 
@@ -143,7 +145,13 @@ export function DevicesManagementPanel({ isRTL = false }: { isRTL?: boolean }) {
           turnOn: 'تشغيل الجهاز',
           openTool: 'فتح الصفحة',
           databaseRecord: 'مرجع قاعدة البيانات',
-          syncedToDatabase: 'محفوظ في قاعدة البيانات'
+          syncedToDatabase: 'محفوظ في قاعدة البيانات',
+          historyTitle: 'السجل والسياج الجغرافي',
+          historyBody: 'اختر جهاز GPS لعرض المسار التاريخي والموقع الحي والسياج الجغرافي.',
+          historySelect: 'اختيار جهاز GPS',
+          historySelectPlaceholder: 'اختر جهازًا',
+          historyEmpty: 'اختر جهاز GPS لعرض السجل والسياج.',
+          historyNoGps: 'لا توجد أجهزة GPS بعد.'
         }
       : {
           heading: 'Connected devices',
@@ -193,7 +201,13 @@ export function DevicesManagementPanel({ isRTL = false }: { isRTL?: boolean }) {
           turnOn: 'Turn on',
           openTool: 'Open page',
           databaseRecord: 'Database record',
-          syncedToDatabase: 'Saved to database'
+          syncedToDatabase: 'Saved to database',
+          historyTitle: 'History & Geofencing',
+          historyBody: 'Choose a GPS device to review its breadcrumb trail, live location, and geofences.',
+          historySelect: 'GPS device',
+          historySelectPlaceholder: 'Select a GPS device',
+          historyEmpty: 'Select a GPS device to load history and geofencing.',
+          historyNoGps: 'No GPS devices available yet.'
         };
   }, [isRTL]);
 
@@ -233,6 +247,14 @@ export function DevicesManagementPanel({ isRTL = false }: { isRTL?: boolean }) {
 
   const linkedProfilesCount = useMemo(() => devices.filter((item) => item.linkedProfileId).length, [devices]);
   const activeDevicesCount = useMemo(() => devices.filter((item) => item.status === 'ACTIVE').length, [devices]);
+  const gpsCapableDevices = useMemo(() => devices.filter((device) => device.type === 'GPS' || device.supportsGps), [devices]);
+  const selectedHistoryDevice = useMemo(() => gpsCapableDevices.find((device) => device.id === historyDeviceId) ?? null, [gpsCapableDevices, historyDeviceId]);
+
+  useEffect(() => {
+    if (historyDeviceId && !gpsCapableDevices.some((device) => device.id === historyDeviceId)) {
+      setHistoryDeviceId('');
+    }
+  }, [gpsCapableDevices, historyDeviceId]);
 
 
 
@@ -458,6 +480,52 @@ export function DevicesManagementPanel({ isRTL = false }: { isRTL?: boolean }) {
         showLog={true}
         isRTL={isRTL}
       />
+
+      <div className="rounded-3xl border border-white/20 bg-white/10 p-5 shadow-2xl text-white space-y-4">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-3">
+              <MapPin className="w-5 h-5" />
+              <h3 className="text-xl font-black">{t.historyTitle}</h3>
+            </div>
+            <p className="text-sm text-white/70 mt-2 max-w-3xl">{t.historyBody}</p>
+          </div>
+          <label className="space-y-2 text-sm min-w-[240px]">
+            <span className="text-white/70">{t.historySelect}</span>
+            <select
+              value={historyDeviceId}
+              onChange={(event) => setHistoryDeviceId(event.target.value)}
+              disabled={loading || gpsCapableDevices.length === 0}
+              className="w-full rounded-2xl bg-white/90 text-slate-900 px-4 py-3 outline-none disabled:opacity-60"
+            >
+              <option value="">{t.historySelectPlaceholder}</option>
+              {gpsCapableDevices.map((device) => (
+                <option key={device.id} value={device.id}>
+                  {device.label} · {device.serialNumber}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        {loading ? (
+          <div className="h-44 rounded-2xl border border-white/15 bg-white/10 animate-pulse" />
+        ) : gpsCapableDevices.length === 0 ? (
+          <div className="rounded-2xl border border-white/15 bg-white/5 px-4 py-6 text-sm text-white/70">
+            {t.historyNoGps}
+          </div>
+        ) : historyDeviceId ? (
+          <TrackingHistoryPanel
+            deviceId={historyDeviceId}
+            deviceLabel={selectedHistoryDevice?.label ?? historyDeviceId}
+            embedded
+          />
+        ) : (
+          <div className="rounded-2xl border border-white/15 bg-white/5 px-4 py-6 text-sm text-white/70">
+            {t.historyEmpty}
+          </div>
+        )}
+      </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-[1.2fr_0.8fr] gap-6">
         <div className="rounded-3xl border border-white/20 bg-white/10 p-5 shadow-2xl text-white">
