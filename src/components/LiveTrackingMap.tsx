@@ -70,8 +70,15 @@ const StableMap = memo(function StableMap({ center, markers, zoom, trail }: Stab
       return false;
     }
   }
-  // Re-render when trail length changes (new point appended)
-  if ((prev.trail?.length ?? 0) !== (next.trail?.length ?? 0)) return false;
+  // Re-render when trail updates (length or last point change)
+  const prevTrail = prev.trail ?? [];
+  const nextTrail = next.trail ?? [];
+  if (prevTrail.length !== nextTrail.length) return false;
+  if (prevTrail.length > 0) {
+    const prevLast = prevTrail[prevTrail.length - 1];
+    const nextLast = nextTrail[nextTrail.length - 1];
+    if (prevLast[0] !== nextLast[0] || prevLast[1] !== nextLast[1]) return false;
+  }
   // center changes only matter when there were no markers before
   if (prev.markers.length === 0 && next.markers.length === 0) {
     return prev.center[0] === next.center[0] && prev.center[1] === next.center[1];
@@ -175,7 +182,7 @@ export function LiveTrackingMap({
     if (!deviceId || historyFetchedRef.current) return;
     historyFetchedRef.current = true;
 
-    fetch(`/api/tracker/history?device_id=${encodeURIComponent(deviceId)}&limit=80`)
+    fetch(`/api/tracker/history?device_id=${encodeURIComponent(deviceId)}&limit=50`)
       .then((r) => r.json())
       .then((data: { trail?: { lat: number; lon: number }[] }) => {
         if (Array.isArray(data.trail) && data.trail.length >= 2) {

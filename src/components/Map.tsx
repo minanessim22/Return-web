@@ -536,49 +536,37 @@ function AnimatedMarker({ point }: { point: MarkerPoint }) {
 }
 
 // ── TrailPolyline – breadcrumb path renderer ─────────────────────
-// Renders the device's recent movement as a fading polyline.
-// The path uses two overlapping lines:
-//   1. A wide, very-transparent halo for visibility on light maps
-//   2. A thinner opaque-blue line for the actual trail
+// Renders the device's recent movement as a semi-transparent blue trail
+// with an opacity gradient: oldest points fade out, newest points are bold.
+
+const TRAIL_MIN_OPACITY = 0.12;
+const TRAIL_MAX_OPACITY = 0.75;
+const TRAIL_WEIGHT = 4;
 
 function TrailPolyline({ trail }: { trail: [number, number][] }) {
   if (trail.length < 2) return null;
+  const segments = trail.length - 1;
+
   return (
     <>
-      {/* Halo — wider, semi-transparent */}
-      <Polyline
-        positions={trail}
-        pathOptions={{
-          color: '#014CB3',
-          weight: 7,
-          opacity: 0.12,
-          lineCap: 'round',
-          lineJoin: 'round',
-        }}
-      />
-      {/* Core trail line */}
-      <Polyline
-        positions={trail}
-        pathOptions={{
-          color: '#014CB3',
-          weight: 3,
-          opacity: 0.55,
-          dashArray: undefined,
-          lineCap: 'round',
-          lineJoin: 'round',
-        }}
-      />
-      {/* Dashed direction indicator */}
-      <Polyline
-        positions={trail}
-        pathOptions={{
-          color: '#60C10F',
-          weight: 1.5,
-          opacity: 0.40,
-          dashArray: '6 10',
-          lineCap: 'round',
-        }}
-      />
+      {trail.slice(1).map((point, idx) => {
+        const start = trail[idx];
+        const progress = segments <= 1 ? 1 : idx / (segments - 1);
+        const opacity = TRAIL_MIN_OPACITY + (TRAIL_MAX_OPACITY - TRAIL_MIN_OPACITY) * progress;
+        return (
+          <Polyline
+            key={`trail-${idx}-${point[0]}-${point[1]}`}
+            positions={[start, point]}
+            pathOptions={{
+              color: '#014CB3',
+              weight: TRAIL_WEIGHT,
+              opacity,
+              lineCap: 'round',
+              lineJoin: 'round',
+            }}
+          />
+        );
+      })}
     </>
   );
 }
