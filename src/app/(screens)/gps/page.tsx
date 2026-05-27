@@ -362,6 +362,9 @@ function GPSPageContent() {
                 <button onClick={handleDelete} disabled={deleting} className="inline-flex items-center gap-2 rounded-full border border-red-200 bg-red-50 px-4 py-2 text-sm font-black text-red-700 disabled:opacity-60">
                   {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />} Delete device
                 </button>
+                <Link href="/tracking/history" className="inline-flex items-center gap-2 rounded-full border border-[#60C10F] bg-[#60C10F]/15 px-4 py-2 text-sm font-bold text-white hover:bg-[#60C10F]/30 transition-colors">
+                  <Route className="h-4 w-4 text-[#60C10F]" /> View History & Geofences
+                </Link>
                 {selectedProfile ? (
                   <Link href={`/identify/${selectedProfile.qrPublicToken}`} target="_blank" className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/10 px-4 py-2 text-sm font-bold hover:bg-white/20">
                     <ExternalLink className="h-4 w-4" /> Open linked profile
