@@ -28,9 +28,6 @@
 
 import { ensureMqttBridge, getMqttEmitter } from '@/lib/server/mqtt-bridge';
 import type { TrackerLocationEvent } from '@/lib/server/mqtt-bridge';
-<<<<<<< HEAD
-import { prisma } from '@/lib/server/prisma';
-=======
 import { insertLocationHistory, insertLocationHistoryBatch, isTrackerRegistered } from '@/lib/server/sqlite-db';
 import { updateStore } from '@/lib/server/store';
 
@@ -97,16 +94,11 @@ async function checkGeofences(deviceId: string, lat: number, lon: number) {
     // Non-fatal — geofence check failure shouldn't block GPS reporting
   }
 }
->>>>>>> 3d11ff46db27411ede60b95464b4749c9e495782
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-<<<<<<< HEAD
-// ── Field alias resolver ──────────────────────────────────────────
-=======
 // ── Types ─────────────────────────────────────────────────────────
->>>>>>> 3d11ff46db27411ede60b95464b4749c9e495782
 
 interface RawPoint {
   lat?: unknown;
@@ -116,12 +108,7 @@ interface RawPoint {
   lng?: unknown;
   battery?: unknown;
   batt?: unknown;
-<<<<<<< HEAD
-  bs?: unknown;             // battery status (Colota)
-  tst?: unknown;            // Unix seconds timestamp (Colota)
-=======
   tst?: unknown;
->>>>>>> 3d11ff46db27411ede60b95464b4749c9e495782
   timestamp?: unknown;
   acc?: unknown;
   accuracy?: unknown;
@@ -130,11 +117,7 @@ interface RawPoint {
   alt?: unknown;
   altitude?: unknown;
   bear?: unknown;
-<<<<<<< HEAD
-  cog?: unknown;            // Colota dawarich mode alias for bearing
-=======
   cog?: unknown;
->>>>>>> 3d11ff46db27411ede60b95464b4749c9e495782
   bearing?: unknown;
   type?: unknown;
   alertType?: unknown;
@@ -152,54 +135,14 @@ interface ParsedPoint {
   recordedAt: Date;
 }
 
-<<<<<<< HEAD
-function resolveNumber(val: unknown): number | undefined {
-=======
 // ── Field resolver helpers ─────────────────────────────────────────
 
 function num(val: unknown): number | undefined {
->>>>>>> 3d11ff46db27411ede60b95464b4749c9e495782
   if (val === null || val === undefined || val === '') return undefined;
   const n = Number(val);
   return Number.isFinite(n) ? n : undefined;
 }
 
-<<<<<<< HEAD
-function resolveNullableCoord(raw: unknown): number | null {
-  if (raw === null || raw === 'null' || raw === undefined) return null;
-  const n = Number(raw);
-  return Number.isFinite(n) ? n : null;
-}
-
-function resolveTimestamp(tst: unknown, fallback: Date): Date {
-  if (tst === undefined || tst === null) return fallback;
-  const n = Number(tst);
-  if (!Number.isFinite(n) || n <= 0) return fallback;
-  // If value looks like Unix seconds (< year 9999 in seconds ≈ 253402300800)
-  return n < 1e10 ? new Date(n * 1000) : new Date(n);
-}
-
-function parsePoint(raw: RawPoint, alertType?: string): ParsedPoint {
-  const now = new Date();
-
-  const lat = resolveNullableCoord(raw.lat ?? raw.latitude);
-  const lon = resolveNullableCoord(raw.lon ?? raw.longitude ?? raw.lng);
-
-  // battery: prefer explicit field, fall back to Colota aliases
-  const battery = resolveNumber(raw.battery ?? raw.batt);
-  const batteryInt = battery !== undefined ? Math.round(battery > 1 ? battery : battery * 100) : undefined;
-
-  return {
-    lat,
-    lon,
-    battery: batteryInt,
-    accuracy: resolveNumber(raw.acc ?? raw.accuracy),
-    speed: resolveNumber(raw.vel ?? raw.speed),
-    altitude: resolveNumber(raw.alt ?? raw.altitude),
-    bearing: resolveNumber(raw.bear ?? raw.cog ?? raw.bearing),
-    alertType: String(alertType ?? raw.alertType ?? raw.type ?? 'location').trim(),
-    recordedAt: resolveTimestamp(raw.tst ?? raw.timestamp, now),
-=======
 function nullableCoord(val: unknown): number | null {
   if (val === null || val === 'null' || val === undefined) return null;
   const n = Number(val);
@@ -233,38 +176,11 @@ function parsePoint(raw: RawPoint, defaultAlertType = 'location'): ParsedPoint {
     bearing: num(raw.bear ?? raw.cog ?? raw.bearing),
     alertType: String(raw.alertType ?? raw.type ?? defaultAlertType).trim(),
     recordedAt: toDate(raw.tst ?? raw.timestamp),
->>>>>>> 3d11ff46db27411ede60b95464b4749c9e495782
   };
 }
 
 // ── DB persist helper ─────────────────────────────────────────────
 
-<<<<<<< HEAD
-async function persistPoint(
-  deviceId: string,
-  point: ParsedPoint,
-  source: 'http' | 'colota' | 'batch' | 'mqtt' = 'http',
-): Promise<void> {
-  if (point.lat === null || point.lon === null) return; // no fix — skip
-  try {
-    await prisma.locationHistory.create({
-      data: {
-        deviceId,
-        lat: point.lat,
-        lon: point.lon,
-        battery: point.battery ?? null,
-        altitude: point.altitude ?? null,
-        speed: point.speed ?? null,
-        accuracy: point.accuracy ?? null,
-        bearing: point.bearing ?? null,
-        alertType: point.alertType,
-        source,
-        recordedAt: point.recordedAt,
-      },
-    });
-  } catch (err) {
-    // Non-fatal — SSE emission still proceeds
-=======
 function persistOne(
   deviceId: string,
   point: ParsedPoint,
@@ -288,7 +204,6 @@ function persistOne(
     });
   } catch (err) {
     // Non-fatal — SSE continues even if DB is locked
->>>>>>> 3d11ff46db27411ede60b95464b4749c9e495782
     console.error('[REPORT] DB persist error:', err);
   }
 }
@@ -306,74 +221,17 @@ function emitToSSE(deviceId: string, point: ParsedPoint): void {
     topic: `return/tracker/${deviceId}/report`,
     alertType: point.alertType,
   };
-<<<<<<< HEAD
-
-  const emitter = getMqttEmitter();
-  emitter.emit('location', event);
-  if (point.alertType === 'fall') {
-    emitter.emit('fall_alert', event);
-  }
-}
-
-// ── Query-param parser (A9G GET format) ───────────────────────────
-
-function parseGetParams(url: URL): { deviceId: string; raw: RawPoint } | { error: string } {
-  const deviceId = url.searchParams.get('device_id')?.trim() || '';
-  if (!deviceId) return { error: 'device_id required' };
-
-  return {
-    deviceId,
-    raw: {
-      lat: url.searchParams.get('lat'),
-      lon: url.searchParams.get('lon'),
-      battery: url.searchParams.get('battery') ?? url.searchParams.get('batt'),
-      tst: url.searchParams.get('tst'),
-      acc: url.searchParams.get('acc'),
-      vel: url.searchParams.get('vel'),
-      alt: url.searchParams.get('alt'),
-      bear: url.searchParams.get('bear'),
-      type: url.searchParams.get('type'),
-    },
-  };
-}
-
-// ── GET – A9G board sends this ────────────────────────────────────
-=======
   const emitter = getMqttEmitter();
   emitter.emit('location', event);
   if (point.alertType === 'fall') emitter.emit('fall_alert', event);
 }
 
 // ── GET – A9G board (query params) ───────────────────────────────
->>>>>>> 3d11ff46db27411ede60b95464b4749c9e495782
 
 export async function GET(request: Request) {
   ensureMqttBridge();
 
   const url = new URL(request.url);
-<<<<<<< HEAD
-  const parsed = parseGetParams(url);
-
-  if ('error' in parsed) {
-    return new Response(parsed.error, { status: 400 });
-  }
-
-  const { deviceId, raw } = parsed;
-  const point = parsePoint(raw);
-  const alertType = String(raw.type ?? 'location').trim();
-
-  await persistPoint(deviceId, { ...point, alertType }, 'http');
-  emitToSSE(deviceId, { ...point, alertType });
-
-  console.log(`[REPORT] ${alertType.toUpperCase()} from ${deviceId} → ${point.lat}, ${point.lon}`);
-
-  return new Response('OK', {
-    status: 200,
-    headers: {
-      'Content-Type': 'text/plain',
-      'Cache-Control': 'no-store',
-    },
-=======
   const deviceId = url.searchParams.get('device_id')?.trim() || url.searchParams.get('id')?.trim() || url.searchParams.get('imei')?.trim() || '';
 
   if (!deviceId) return new Response('device_id required', { status: 400 });
@@ -415,7 +273,6 @@ export async function GET(request: Request) {
   return new Response('OK', {
     status: 200,
     headers: { 'Content-Type': 'text/plain', 'Cache-Control': 'no-store' },
->>>>>>> 3d11ff46db27411ede60b95464b4749c9e495782
   });
 }
 
@@ -424,18 +281,6 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   ensureMqttBridge();
 
-<<<<<<< HEAD
-  let body: Record<string, unknown>;
-  try {
-    body = await request.json();
-  } catch {
-    return new Response('Invalid JSON', { status: 400 });
-  }
-
-  const deviceId = String(body.device_id ?? body.deviceId ?? '').trim();
-  if (!deviceId) {
-    return new Response('device_id required', { status: 400 });
-=======
   let body: Record<string, unknown> = {};
   try {
     const text = await request.text();
@@ -455,40 +300,11 @@ export async function POST(request: Request) {
   if (!await isTrackerRegistered(deviceId)) {
     console.warn(`[REPORT POST] REJECTED unregistered device: ${deviceId}`);
     return new Response('Unauthorized device', { status: 401 });
->>>>>>> 3d11ff46db27411ede60b95464b4749c9e495782
   }
 
   // ── Batch mode: { device_id, locations: [...] } ───────────────
   if (Array.isArray(body.locations) && body.locations.length > 0) {
     const rawList = body.locations as RawPoint[];
-<<<<<<< HEAD
-    let saved = 0;
-    let failed = 0;
-
-    // Process in parallel (max 50 at once to avoid connection pool saturation)
-    const chunks = [];
-    for (let i = 0; i < rawList.length; i += 50) {
-      chunks.push(rawList.slice(i, i + 50));
-    }
-
-    for (const chunk of chunks) {
-      await Promise.all(
-        chunk.map(async (raw) => {
-          try {
-            const point = parsePoint(raw);
-            await persistPoint(deviceId, point, 'batch');
-            emitToSSE(deviceId, point);
-            saved++;
-          } catch {
-            failed++;
-          }
-        })
-      );
-    }
-
-    console.log(`[REPORT] BATCH from ${deviceId}: ${saved} saved, ${failed} failed`);
-    return Response.json({ saved, failed }, { status: 200 });
-=======
     const now = new Date().toISOString();
 
     const dbRows = rawList
@@ -532,23 +348,11 @@ export async function POST(request: Request) {
 
     console.log(`[REPORT BATCH] ${deviceId}: ${rawList.length} in → ${saved} saved, ${skipped} skipped`);
     return Response.json({ saved, skipped, failed: rawList.length - dbRows.length }, { status: 200 });
->>>>>>> 3d11ff46db27411ede60b95464b4749c9e495782
   }
 
   // ── Single point mode ─────────────────────────────────────────
   const point = parsePoint(body as RawPoint);
 
-<<<<<<< HEAD
-  // Detect source: Colota sends "batt" or "tst" fields
-  const source = (body.batt !== undefined || body.tst !== undefined || body.acc !== undefined)
-    ? 'colota'
-    : 'http';
-
-  await persistPoint(deviceId, point, source);
-  emitToSSE(deviceId, point);
-
-  console.log(`[REPORT] ${point.alertType.toUpperCase()} from ${deviceId} → ${point.lat}, ${point.lon}`);
-=======
   if (point.lat !== null && (!Number.isFinite(point.lat) || !Number.isFinite(point.lon!))) {
     return new Response('lat/lon invalid', { status: 400 });
   }
@@ -566,7 +370,6 @@ export async function POST(request: Request) {
   }
 
   console.log(`[REPORT POST] ${point.alertType.toUpperCase()} from ${deviceId} → ${point.lat}, ${point.lon}`);
->>>>>>> 3d11ff46db27411ede60b95464b4749c9e495782
 
   return new Response('OK', { status: 200 });
 }

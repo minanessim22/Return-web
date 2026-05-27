@@ -4,11 +4,6 @@
  * React hook that opens a Server-Sent Events connection to
  * /api/tracker/stream and returns the latest GPS location
  * events in real time, including fall alert detection.
-<<<<<<< HEAD
- *
- * Usage:
- *   const { events, latestByDevice, connected, fallAlerts } = useTrackerStream();
-=======
  *
  * Reconnection strategy: Exponential Backoff with Jitter
  *   Attempt 1 → 2s ± 20%
@@ -21,7 +16,6 @@
  * Usage:
  *   const { events, latestByDevice, connected, fallAlerts,
  *           reconnectAttempt, isRecovering } = useTrackerStream();
->>>>>>> 3d11ff46db27411ede60b95464b4749c9e495782
  * ─────────────────────────────────────────────────────────────────
  */
 
@@ -66,15 +60,12 @@ export function useTrackerStream() {
   const [latestByDevice, setLatestByDevice] = useState<Record<string, TrackerEvent>>({});
   const [connected, setConnected] = useState(false);
   const [fallAlerts, setFallAlerts] = useState<TrackerEvent[]>([]);
-<<<<<<< HEAD
-=======
 
   /** Current reconnect attempt count (resets to 0 on successful connect) */
   const [reconnectAttempt, setReconnectAttempt] = useState(0);
   /** True while we are in the backoff wait period before next retry */
   const [isRecovering, setIsRecovering] = useState(false);
 
->>>>>>> 3d11ff46db27411ede60b95464b4749c9e495782
   const esRef = useRef<EventSource | null>(null);
   const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const attemptRef = useRef(0); // mutable mirror of reconnectAttempt for closure access
@@ -178,9 +169,6 @@ export function useTrackerStream() {
     setFallAlerts((prev) => prev.filter((_, i) => i !== index));
   }, []);
 
-<<<<<<< HEAD
-  return { events, latestByDevice, connected, fallAlerts, dismissFallAlert };
-=======
   return {
     events,
     latestByDevice,
@@ -192,5 +180,4 @@ export function useTrackerStream() {
     /** True while waiting in backoff before next retry */
     isRecovering,
   };
->>>>>>> 3d11ff46db27411ede60b95464b4749c9e495782
 }
