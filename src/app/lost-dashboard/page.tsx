@@ -163,7 +163,7 @@ const translations = {
     sideMyReports: 'تقاريري',
     sideNotifications: 'الإشعارات',
     sideDevices: 'الأجهزة',
-    sideHistory: 'السجل والنطاقات',
+    sideHistory: 'سجل التتبع والسياج الجغرافي',
     sideSettings: 'الإعدادات',
     sideLogout: 'تسجيل خروج',
     hello: 'مرحباً،',
@@ -1360,6 +1360,7 @@ export default function DashboardLostPage() {
                     (item.label === t.foundMatches && activeTab === 'matches') ||
                     (item.label === t.sideNotifications && activeTab === 'notifications') ||
                     (item.label === t.sideDevices && activeTab === 'devices') ||
+                    (item.label === t.sideHistory && activeTab === 'history') ||
                     (item.label === t.sideSettings && activeTab === 'settings')
                       ? 'text-white'
                       : 'text-white/70 group-hover:text-white'

@@ -16,7 +16,7 @@ import {
   MapPin, BarChart3, Shield, Plus, Trash2,
   Clock, Navigation, Zap, Battery, Activity, ArrowLeft,
   Calendar, TrendingUp, AlertCircle, Eye, EyeOff, ChevronRight,
-  Radio, ChevronDown,
+  Radio, ChevronDown
 } from 'lucide-react';
 
 const DynamicMap = dynamic(() => import('@/components/Map'), { ssr: false });
@@ -66,7 +66,6 @@ function fmtTime(iso: string | null) {
   if (!iso) return '—';
   return new Date(iso).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 }
-// ── Page ──────────────────────────────────────────────────────────
 
 interface GpsDevice {
   id: string;
@@ -113,65 +112,83 @@ export default function TrackingHistoryPage() {
   // ── Load devices on mount ───────────────────────────────────────
 
   useEffect(() => {
+    let active = true;
     (async () => {
       try {
         const r = await fetch('/api/devices');
-        if (r.ok) {
+        if (r.ok && active) {
           const d = await r.json();
           const items: GpsDevice[] = (d.items || []).filter((dev: any) => dev.type === 'GPS');
           setDevices(items);
           if (items.length > 0) {
-            setSelectedDevice(items[0].serialNumber || items[0].id);
+            const params = new URLSearchParams(window.location.search);
+            const queryDevId = params.get('device_id');
+            const foundQueryDev = items.find(dev => dev.id === queryDevId || dev.serialNumber === queryDevId);
+            if (foundQueryDev) {
+              setSelectedDevice(foundQueryDev.serialNumber || foundQueryDev.id);
+            } else {
+              setSelectedDevice(items[0].serialNumber || items[0].id);
+            }
           }
         }
       } catch { /* ignore */ }
-      finally { setDevicesLoading(false); }
+      finally { if (active) setDevicesLoading(false); }
     })();
+    return () => { active = false; };
   }, []);
 
   // ── Loaders ─────────────────────────────────────────────────────
 
-  const loadStats = useCallback(async (date: string) => {
-    if (!selectedDevice) return;
+  const loadStats = useCallback(async (date: string, deviceId: string) => {
+    if (!deviceId) return;
     setStatsLoading(true);
     try {
-      const r = await fetch(`/api/tracker/stats?device_id=${selectedDevice}&date=${date}`);
+      const r = await fetch(`/api/tracker/stats?device_id=${deviceId}&date=${date}`);
       setStats(r.ok ? await r.json() : null);
     } catch { setStats(null); }
     finally { setStatsLoading(false); }
-  }, [selectedDevice]);
+  }, []);
 
-  const loadTrail = useCallback(async (date: string) => {
-    if (!selectedDevice) return;
+  const loadTrail = useCallback(async (date: string, deviceId: string) => {
+    if (!deviceId) return;
     setTrailLoading(true);
     try {
-      const r = await fetch(`/api/tracker/history?device_id=${selectedDevice}&from=${date}T00:00:00Z&to=${date}T23:59:59Z&limit=2000`);
+      const r = await fetch(`/api/tracker/history?device_id=${deviceId}&from=${date}T00:00:00Z&to=${date}T23:59:59Z&limit=2000`);
       const d = await r.json();
       setTrail(Array.isArray(d.trail) ? d.trail : []);
     } catch { setTrail([]); }
     finally { setTrailLoading(false); }
-  }, [selectedDevice]);
+  }, []);
 
-  const loadGeo = useCallback(async () => {
-    if (!selectedDevice) return;
+  const loadGeo = useCallback(async (deviceId: string) => {
+    if (!deviceId) return;
     setGeoLoading(true);
     try {
-      const r = await fetch(`/api/tracker/geofences?device_id=${selectedDevice}`);
+      const r = await fetch(`/api/tracker/geofences?device_id=${deviceId}`);
       const d = await r.json();
       setGeofences(Array.isArray(d.geofences) ? d.geofences : []);
     } catch { setGeofences([]); }
     finally { setGeoLoading(false); }
-  }, [selectedDevice]);
+  }, []);
 
-  useEffect(() => { if (selectedDevice) loadStats(selectedDate); }, [selectedDate, selectedDevice, loadStats]);
-  useEffect(() => { if (activeTab === 'history' && selectedDevice) loadTrail(selectedDate); }, [activeTab, selectedDate, selectedDevice, loadTrail]);
-  useEffect(() => { if (activeTab === 'geofences' && selectedDevice) loadGeo(); }, [activeTab, selectedDevice, loadGeo]);
+  useEffect(() => {
+    if (selectedDevice) loadStats(selectedDate, selectedDevice);
+  }, [selectedDate, selectedDevice, loadStats]);
+
+  useEffect(() => {
+    if (activeTab === 'history' && selectedDevice) loadTrail(selectedDate, selectedDevice);
+  }, [activeTab, selectedDate, selectedDevice, loadTrail]);
+
+  useEffect(() => {
+    if (activeTab === 'geofences' && selectedDevice) loadGeo(selectedDevice);
+  }, [activeTab, selectedDevice, loadGeo]);
 
   // ── Geofence CRUD ───────────────────────────────────────────────
 
   const createFence = async () => {
     if (!fenceName.trim()) return notify('Please enter a name', false);
     if (!fenceCenter) return notify('Click on the map to place geofence center', false);
+    if (!selectedDevice) return notify('No device selected', false);
     setSaving(true);
     try {
       const r = await fetch('/api/tracker/geofences', {
@@ -186,7 +203,7 @@ export default function TrackingHistoryPage() {
       });
       if (!r.ok) throw new Error();
       setFenceName(''); setFenceCenter(null); setFenceRadius('200'); setShowCreate(false);
-      await loadGeo();
+      await loadGeo(selectedDevice);
       notify('Geofence created successfully ✓');
     } catch { notify('Failed to create geofence', false); }
     finally { setSaving(false); }
@@ -198,7 +215,7 @@ export default function TrackingHistoryPage() {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ isActive: !f.isActive }),
       });
-      await loadGeo();
+      await loadGeo(selectedDevice);
       notify(f.isActive ? 'Geofence disabled' : 'Geofence enabled');
     } catch { notify('Update failed', false); }
   };
@@ -207,7 +224,7 @@ export default function TrackingHistoryPage() {
     if (!confirm('Delete this geofence?')) return;
     try {
       await fetch(`/api/tracker/geofences?id=${id}`, { method: 'DELETE' });
-      await loadGeo();
+      await loadGeo(selectedDevice);
       notify('Geofence deleted');
     } catch { notify('Delete failed', false); }
   };
@@ -260,39 +277,47 @@ export default function TrackingHistoryPage() {
       <header className="bg-white/80 backdrop-blur-xl border-b border-gray-100 sticky top-0 z-40">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4">
           <div className="flex items-center gap-3 mb-3">
+            <Link href="/devices" className="flex items-center justify-center w-9 h-9 rounded-xl bg-gray-100 hover:bg-gray-200 transition-colors">
+              <ArrowLeft className="w-4 h-4 text-gray-600" />
+            </Link>
             <div className="flex-1 min-w-0">
               <h1 className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight">
                 Location Intelligence
               </h1>
-              {/* Device selector */}
+              
+              {/* Device Selector */}
               <div className="relative mt-1">
                 <button
                   onClick={() => setShowDevicePicker(!showDevicePicker)}
                   className="flex items-center gap-1.5 text-xs text-gray-400 font-medium hover:text-[#014CB3] transition-colors"
                 >
-                  <Radio className="w-3 h-3" />
-                  Device: <span className="text-[#014CB3] font-bold">{selectedDevice || 'None'}</span>
-                  <ChevronDown className={`w-3 h-3 transition-transform ${showDevicePicker ? 'rotate-180' : ''}`} />
+                  <Radio className="w-3 h-3 text-gray-400" />
+                  Device: <span className="text-[#014CB3] font-bold">{devices.find(d => d.serialNumber === selectedDevice || d.id === selectedDevice)?.label || selectedDevice || 'Select Device'}</span>
+                  <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showDevicePicker ? 'rotate-180' : ''}`} />  
                 </button>
                 {showDevicePicker && (
-                  <div className="absolute top-6 left-0 bg-white border border-gray-200 rounded-xl shadow-xl z-50 min-w-[200px] py-1">
+                  <div className="absolute top-6 left-0 bg-white border border-gray-100 rounded-xl shadow-xl z-50 min-w-[220px] py-1.5 overflow-hidden">
                     {devicesLoading ? (
                       <p className="px-4 py-2 text-xs text-gray-400">Loading devices...</p>
                     ) : devices.length === 0 ? (
                       <p className="px-4 py-2 text-xs text-gray-400">No GPS devices found</p>
-                    ) : devices.map((dev) => (
-                      <button
-                        key={dev.id}
-                        onClick={() => { setSelectedDevice(dev.serialNumber || dev.id); setShowDevicePicker(false); }}
-                        className={`w-full text-left px-4 py-2 text-xs font-medium hover:bg-blue-50 transition-colors ${
-                          (dev.serialNumber || dev.id) === selectedDevice ? 'text-[#014CB3] font-bold bg-blue-50/50' : 'text-gray-600'
-                        }`}
-                      >
-                        <span className="font-bold">{dev.label || dev.serialNumber}</span>
-                        <span className="text-gray-300 ml-1.5">{dev.serialNumber}</span>
-                        {dev.status === 'ACTIVE' && <span className="ml-2 text-emerald-500">●</span>}
-                      </button>
-                    ))}
+                    ) : (
+                      devices.map((dev) => {
+                        const devVal = dev.serialNumber || dev.id;
+                        return (
+                          <button
+                            key={dev.id}
+                            onClick={() => { setSelectedDevice(devVal); setShowDevicePicker(false); }}
+                            className={`w-full text-left px-4 py-2 text-xs font-semibold hover:bg-blue-50/50 transition-colors flex items-center justify-between ${
+                              devVal === selectedDevice ? 'text-[#014CB3] font-black bg-blue-50/30' : 'text-gray-600'
+                            }`}
+                          >
+                            <span className="truncate max-w-[120px]">{dev.label || dev.serialNumber}</span>
+                            <span className="text-[10px] text-gray-300 font-mono ml-2 truncate max-w-[60px]">{dev.serialNumber}</span>
+                          </button>
+                        );
+                      })
+                    )}
                   </div>
                 )}
               </div>
@@ -330,11 +355,18 @@ export default function TrackingHistoryPage() {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6 pb-20">
-
-        {/* ══════════════════════════════════════════════════════════
-            TAB: DAILY STATS
-           ══════════════════════════════════════════════════════════ */}
-        {activeTab === 'stats' && (
+        {!devicesLoading && devices.length === 0 ? (
+          <EmptyState
+            icon={Radio}
+            title="No GPS devices registered"
+            subtitle="Please register a GPS device in the Devices management panel first to start tracking."
+          />
+        ) : (
+          <>
+            {/* ══════════════════════════════════════════════════════════
+                TAB: DAILY STATS
+               ══════════════════════════════════════════════════════════ */}
+            {activeTab === 'stats' && (
           <div>
             {statsLoading ? (
               <LoadingState label="Loading statistics..." />
@@ -581,6 +613,8 @@ export default function TrackingHistoryPage() {
               </div>
             )}
           </div>
+        )}
+          </>
         )}
       </main>
 

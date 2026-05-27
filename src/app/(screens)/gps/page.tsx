@@ -245,13 +245,13 @@ function GPSPageContent() {
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
-            <button onClick={() => void loadData(selectedId)} className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/10 px-5 py-3 font-bold transition hover:bg-white/20">
-              <RefreshCw className="h-4 w-4" /> Refresh devices
-            </button>
-            <button onClick={handleCreateNew} className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-3 font-black text-[#014CB3] shadow-lg">
-              <Plus className="h-4 w-4" /> New GPS tracker
-            </button>
-          </div>
+              <button onClick={() => void loadData(selectedId)} className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/10 px-5 py-3 font-bold transition hover:bg-white/20">
+                <RefreshCw className="h-4 w-4" /> Refresh devices
+              </button>
+              <button onClick={handleCreateNew} className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-3 font-black text-[#014CB3] shadow-lg">
+                <Plus className="h-4 w-4" /> New GPS tracker
+              </button>
+            </div>
         </div>
 
         {message ? <div className="mb-5 rounded-[1.5rem] bg-emerald-50 px-5 py-4 text-sm font-semibold text-emerald-700">{message}</div> : null}
@@ -377,12 +377,15 @@ function GPSPageContent() {
                 <Route className="h-5 w-5" />
                 <h2 className="text-xl font-black">Live map</h2>
               </div>
-              <div className="h-[250px]">
-                {coordinates || locationMarkers.length > 0 ? (
-                  <MapClient center={coordinates || locationMarkers[0].position} markers={locationMarkers.length > 0 ? locationMarkers : undefined} marker={coordinates} />
-                ) : (
-                  <div className="flex h-full items-center justify-center px-6 text-center text-sm text-white/70">Capture a real location and the map will show the saved point and recent history.</div>
-                )}
+              <div className="h-[250px] overflow-hidden rounded-b-[2rem]">
+                <MapClient
+                  center={coordinates || (locationMarkers.length > 0 ? locationMarkers[0].position : [30.0444, 31.2357])}
+                  markers={locationMarkers.length > 0 ? locationMarkers : undefined}
+                  marker={coordinates}
+                  zoom={13}
+                  scrollWheelZoom={true}
+                  showControls={true}
+                />
               </div>
             </div>
 

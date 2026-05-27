@@ -6,7 +6,8 @@ import { useRouter } from 'next/navigation';
 import {
   FileText, Grid,
   UserCircle, Bell, Monitor, Settings, LogOut,
-  Search, SlidersHorizontal, ImageIcon, Clock, ChevronDown, Save, X
+  Search, SlidersHorizontal, ImageIcon, Clock, ChevronDown, Save, X,
+  MapPinned
 } from 'lucide-react';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { api } from '@/lib/api';
@@ -27,6 +28,7 @@ const translations = {
     sideMyReports: 'My Reports',
     sideNotifications: 'Notifications',
     sideDevices: 'Devices',
+    sideHistory: 'History & Geofencing',
     sideSettings: 'Settings',
     sideLogout: 'LOGOUT',
     hello: 'Hello,',
@@ -169,6 +171,7 @@ const translations = {
     sideMyReports: 'تقاريري',
     sideNotifications: 'الإشعارات',
     sideDevices: 'الأجهزة',
+    sideHistory: 'سجل التتبع والسياج الجغرافي',
     sideSettings: 'الإعدادات',
     sideLogout: 'تسجيل خروج',
     hello: 'مرحباً،',
@@ -902,7 +905,7 @@ function DevicesHeaderContent({ t, isRTL }: { t: typeof translations['EN']; isRT
 
 export default function DashboardLostPage() {
   const [currentLanguage, setCurrentLanguage] = useState<'EN' | 'AR'>('EN');
-  const [activeTab, setActiveTab] = useState<'overview' | 'myReports' | 'matches' | 'notifications' | 'devices' | 'settings' | 'profile' | 'missing' | 'found' | 'devicesHeader'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'myReports' | 'matches' | 'notifications' | 'devices' | 'history' | 'settings' | 'profile' | 'missing' | 'found' | 'devicesHeader'>('overview');
   const router = useRouter();
   const { user, logout } = useAuth();
 
@@ -910,7 +913,7 @@ export default function DashboardLostPage() {
     if (typeof window === 'undefined') return;
     localStorage.setItem('return:lastDashboard', 'found');
     const requestedTab = new URLSearchParams(window.location.search).get('tab');
-    if (requestedTab && ['overview', 'myReports', 'notifications', 'devices', 'settings', 'profile', 'missing', 'found', 'devicesHeader'].includes(requestedTab)) {
+    if (requestedTab && ['overview', 'myReports', 'notifications', 'devices', 'history', 'settings', 'profile', 'missing', 'found', 'devicesHeader'].includes(requestedTab)) {
       setActiveTab(requestedTab as typeof activeTab);
     }
   }, []);
@@ -959,6 +962,7 @@ export default function DashboardLostPage() {
     { label: t.possibleMatches, icon: <Search className="w-5 h-5" />, onClick: () => setActiveTab('matches') },
     { label: t.sideNotifications, icon: <Bell className="w-5 h-5" />, onClick: () => setActiveTab('notifications') },
     { label: t.sideDevices, icon: <Monitor className="w-5 h-5" />, onClick: () => setActiveTab('devices') },
+    { label: t.sideHistory, icon: <MapPinned className="w-5 h-5" />, onClick: () => setActiveTab('history') },
     { label: t.sideSettings, icon: <Settings className="w-5 h-5" />, onClick: () => setActiveTab('settings') },
   ];
 
@@ -1041,6 +1045,7 @@ export default function DashboardLostPage() {
                     (item.label === t.possibleMatches && activeTab === 'matches') ||
                     (item.label === t.sideNotifications && activeTab === 'notifications') ||
                     (item.label === t.sideDevices && activeTab === 'devices') ||
+                    (item.label === t.sideHistory && activeTab === 'history') ||
                     (item.label === t.sideSettings && activeTab === 'settings')
                       ? isRTL ? 'bg-white/25 border-white border-r-4 rounded-r-full shadow-lg' : 'bg-white/25 border-white border-l-4 rounded-l-full shadow-lg'
                       : isRTL ? 'hover:bg-white/10 rounded-r-full' : 'hover:bg-white/10 rounded-l-full'
@@ -1051,6 +1056,7 @@ export default function DashboardLostPage() {
                     (item.label === t.possibleMatches && activeTab === 'matches') ||
                     (item.label === t.sideNotifications && activeTab === 'notifications') ||
                     (item.label === t.sideDevices && activeTab === 'devices') ||
+                    (item.label === t.sideHistory && activeTab === 'history') ||
                     (item.label === t.sideSettings && activeTab === 'settings')
                       ? 'text-white' : 'text-white/70 group-hover:text-white'
                   }`}>{item.icon}</span>
@@ -1059,6 +1065,7 @@ export default function DashboardLostPage() {
                     (item.label === t.possibleMatches && activeTab === 'matches') ||
                     (item.label === t.sideNotifications && activeTab === 'notifications') ||
                     (item.label === t.sideDevices && activeTab === 'devices') ||
+                    (item.label === t.sideHistory && activeTab === 'history') ||
                     (item.label === t.sideSettings && activeTab === 'settings')
                       ? 'text-white font-bold' : 'text-white/70 group-hover:text-white'
                   }`}>{item.label}</span>
@@ -1100,6 +1107,14 @@ export default function DashboardLostPage() {
             <DevicesContent t={t} isRTL={isRTL} />
           ) : activeTab === 'devicesHeader' ? (
             <DevicesHeaderContent t={t} isRTL={isRTL} />
+          ) : activeTab === 'history' ? (
+            <div className="-m-6 md:-m-10 h-full">
+              <iframe
+                src="/tracking/history"
+                className="w-full h-full border-0 rounded-xl"
+                style={{ minHeight: 'calc(100vh - 140px)' }}
+              />
+            </div>
           ) : activeTab === 'settings' ? (
             <SettingsContent t={t} isRTL={isRTL} />
           ) : activeTab === 'profile' ? (
