@@ -582,24 +582,17 @@ async function waitForPendingWrites() {
   await storeWriteChain.catch(() => undefined);
 }
 
-let globalStoreCache: Store | null = null;
-
 async function readStoreSnapshot(): Promise<Store> {
-  if (globalStoreCache) {
-    return JSON.parse(JSON.stringify(globalStoreCache));
-  }
   try {
-    globalStoreCache = normalizeStore(await readRawStoreFromSqlite());
-    return JSON.parse(JSON.stringify(globalStoreCache));
+    const raw = await readRawStoreFromSqlite();
+    return normalizeStore(raw);
   } catch (error) {
     console.warn('Supabase store unavailable, using empty store.', error);
-    globalStoreCache = normalizeStore({});
-    return JSON.parse(JSON.stringify(globalStoreCache));
+    return normalizeStore({});
   }
 }
 
 async function persistStore(normalized: Store) {
-  globalStoreCache = normalizeStore(normalized);
   try {
     await writeRawStoreToSqlite(normalized);
   } catch (error) {
