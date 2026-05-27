@@ -1,23 +1,9 @@
 import { hashPassword, readStore, updateStore } from '@/lib/server/store';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
-/**
- * Emergency admin password reset.
- * POST /api/auth/admin-reset
- * Body: { email: "admin@return.codes", newPassword: "Admin@Return2026" }
- *
- * ⚠️ DELETE THIS FILE AFTER USE — it's for dev/graduation demo only.
- */
-export async function POST(request: Request) {
-  const body = await request.json();
-  const email = String(body.email || '').trim().toLowerCase();
-  const newPassword = String(body.newPassword || '');
-
-  if (!email || !newPassword) {
-    return Response.json({ error: 'email and newPassword required' }, { status: 400 });
-  }
-
+async function performReset(email: string, newPassword: string) {
   const store = await readStore();
   const user = store.users.find((u) => u.email.toLowerCase() === email);
 
@@ -38,8 +24,6 @@ export async function POST(request: Request) {
         avatarUrl: '',
         phone: '',
         dateOfBirth: '',
-        gender: '',
-        country: 'Egypt',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         lastLoginAt: undefined,
@@ -62,7 +46,7 @@ export async function POST(request: Request) {
         },
       } as any);
     });
-    return Response.json({ ok: true, action: 'created', email });
+    return { ok: true, action: 'created', email };
   }
 
   // User exists — reset password
@@ -72,9 +56,34 @@ export async function POST(request: Request) {
     target.passwordHash = hashPassword(newPassword);
     target.failedLoginCount = 0;
     target.lockedUntil = undefined;
-    if (target.status === 'LOCKED') target.status = 'ACTIVE';
+    target.status = 'ACTIVE';
     target.updatedAt = new Date().toISOString();
   });
 
-  return Response.json({ ok: true, action: 'password_reset', email, userId: user.id });
+  return { ok: true, action: 'password_reset', email, userId: user.id };
+}
+
+export async function GET(request: Request) {
+  const result = await performReset('admin@return.codes', 'Admin@Return2026');
+  return Response.json({
+    message: 'Admin user has been successfully created/reset in the store.',
+    result
+  });
+}
+
+export async function POST(request: Request) {
+  try {
+    const body = await request.json();
+    const email = String(body.email || '').trim().toLowerCase();
+    const newPassword = String(body.newPassword || '');
+
+    if (!email || !newPassword) {
+      return Response.json({ error: 'email and newPassword required' }, { status: 400 });
+    }
+
+    const result = await performReset(email, newPassword);
+    return Response.json(result);
+  } catch (err: any) {
+    return Response.json({ error: err.message }, { status: 500 });
+  }
 }
