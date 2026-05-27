@@ -128,9 +128,10 @@ export async function POST(request: Request) {
     return Response.json({ error: 'device_id required' }, { status: 400 });
   }
 
-  // ── Registration check (non-blocking) ───────────────────────────
+  // ── Registration check (blocking) ──────────────────────────────
   if (!await isTrackerRegistered(deviceId)) {
     console.warn(`[BATCH] Unregistered device: ${deviceId}`);
+    return new Response('Device not registered. Ingestion blocked.', { status: 403 });
   }
 
   if (!Array.isArray(body.locations) || body.locations.length === 0) {
