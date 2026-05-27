@@ -251,6 +251,9 @@ function GPSPageContent() {
               <button onClick={handleCreateNew} className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-3 font-black text-[#014CB3] shadow-lg">
                 <Plus className="h-4 w-4" /> New GPS tracker
               </button>
+              <Link href="/tracking/history" className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-[#60C10F] to-[#014CB3] px-5 py-3 font-black text-white shadow-lg hover:shadow-xl transition">
+                <Route className="h-4 w-4" /> History & Geofencing
+              </Link>
             </div>
         </div>
 
@@ -377,15 +380,12 @@ function GPSPageContent() {
                 <Route className="h-5 w-5" />
                 <h2 className="text-xl font-black">Live map</h2>
               </div>
-              <div className="h-[250px] overflow-hidden rounded-b-[2rem]">
-                <MapClient
-                  center={coordinates || (locationMarkers.length > 0 ? locationMarkers[0].position : [30.0444, 31.2357])}
-                  markers={locationMarkers.length > 0 ? locationMarkers : undefined}
-                  marker={coordinates}
-                  zoom={13}
-                  scrollWheelZoom={true}
-                  showControls={true}
-                />
+              <div className="h-[250px]">
+                {coordinates || locationMarkers.length > 0 ? (
+                  <MapClient center={coordinates || locationMarkers[0].position} markers={locationMarkers.length > 0 ? locationMarkers : undefined} marker={coordinates} />
+                ) : (
+                  <div className="flex h-full items-center justify-center px-6 text-center text-sm text-white/70">Capture a real location and the map will show the saved point and recent history.</div>
+                )}
               </div>
             </div>
 
