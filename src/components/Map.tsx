@@ -535,10 +535,6 @@ function AnimatedMarker({ point }: { point: MarkerPoint }) {
   );
 }
 
-<<<<<<< HEAD
-// ── Map – main exported component ────────────────────────────────
-
-=======
 // ── TrailPolyline – breadcrumb path renderer ─────────────────────
 // Renders the device's recent movement as a fading polyline.
 // The path uses two overlapping lines:
@@ -608,8 +604,6 @@ function ClickHandler({ onClick }: { onClick?: (lat: number, lon: number) => voi
   });
   return null;
 }
-
->>>>>>> 3d11ff46db27411ede60b95464b4749c9e495782
 type Props = {
   center?: [number, number];
   marker?: [number, number];
@@ -630,8 +624,6 @@ type Props = {
    * NOT to the viewer's browser geolocation.
    */
   deviceCenter?: [number, number];
-<<<<<<< HEAD
-=======
   /**
    * Ordered array of [lat, lon] tuples representing the device's
    * recent movement path. Rendered as a semi-transparent breadcrumb trail.
@@ -641,7 +633,6 @@ type Props = {
   onMapClick?: (lat: number, lon: number) => void;
   /** Circles to render (e.g. geofence boundaries) */
   circles?: CircleOverlay[];
->>>>>>> 3d11ff46db27411ede60b95464b4749c9e495782
 };
 
 export default function Map({
@@ -653,12 +644,9 @@ export default function Map({
   showControls = false,
   scrollWheelZoom = false,
   deviceCenter,
-<<<<<<< HEAD
-=======
   trail,
   onMapClick,
   circles,
->>>>>>> 3d11ff46db27411ede60b95464b4749c9e495782
 }: Props) {
   const [mounted, setMounted] = useState(false);
 
@@ -728,8 +716,6 @@ export default function Map({
         <MapResizer />
         <MapViewport center={center} markers={effectiveMarkers} zoom={zoom} />
         <MapControls showControls={showControls} deviceCenter={deviceCenter ?? (effectiveMarkers[0]?.position)} />
-<<<<<<< HEAD
-=======
         {trail && trail.length >= 2 && <TrailPolyline trail={trail} />}
         {onMapClick && <ClickHandler onClick={onMapClick} />}
         {circles && circles.map((c, i) => (
@@ -749,7 +735,6 @@ export default function Map({
             {c.label && <Popup>{c.label}</Popup>}
           </Circle>
         ))}
->>>>>>> 3d11ff46db27411ede60b95464b4749c9e495782
         <TileLayer
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'

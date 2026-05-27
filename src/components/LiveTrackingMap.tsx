@@ -27,10 +27,7 @@ import React, { useEffect, useMemo, useState, useRef, memo } from 'react';
 import dynamic from 'next/dynamic';
 import { Activity, MapPin, Radio, WifiOff, Zap, Clock, Battery, Signal } from 'lucide-react';
 import { useTrackerStream } from '@/lib/useTrackerStream';
-<<<<<<< HEAD
-=======
 import { bindAutoFlush } from '@/lib/offlineQueue';
->>>>>>> 3d11ff46db27411ede60b95464b4749c9e495782
 import type { MarkerPoint } from '@/components/Map';
 
 // ── Stable map wrapper (memoised – never re-mounts) ──────────────
@@ -43,20 +40,13 @@ interface StableMapProps {
   center: [number, number];
   markers: MarkerPoint[];
   zoom: number;
-<<<<<<< HEAD
-=======
   trail?: [number, number][];
->>>>>>> 3d11ff46db27411ede60b95464b4749c9e495782
 }
 
 // React.memo with a custom comparison: only update when a marker
 // position actually changes.  This prevents the tick timer or header
 // badge updates from causing the map canvas to re-render.
-<<<<<<< HEAD
-const StableMap = memo(function StableMap({ center, markers, zoom }: StableMapProps) {
-=======
 const StableMap = memo(function StableMap({ center, markers, zoom, trail }: StableMapProps) {
->>>>>>> 3d11ff46db27411ede60b95464b4749c9e495782
   return (
     <DynamicMap
       center={center}
@@ -65,18 +55,11 @@ const StableMap = memo(function StableMap({ center, markers, zoom, trail }: Stab
       animate={true}
       showControls={true}
       scrollWheelZoom={true}
-<<<<<<< HEAD
-    />
-  );
-}, (prev, next) => {
-  // Return true (skip re-render) when markers haven't changed
-=======
       trail={trail}
     />
   );
 }, (prev, next) => {
   // Return true (skip re-render) when markers AND trail haven't changed
->>>>>>> 3d11ff46db27411ede60b95464b4749c9e495782
   if (prev.markers.length !== next.markers.length) return false;
   for (let i = 0; i < prev.markers.length; i++) {
     if (
@@ -87,11 +70,8 @@ const StableMap = memo(function StableMap({ center, markers, zoom, trail }: Stab
       return false;
     }
   }
-<<<<<<< HEAD
-=======
   // Re-render when trail length changes (new point appended)
   if ((prev.trail?.length ?? 0) !== (next.trail?.length ?? 0)) return false;
->>>>>>> 3d11ff46db27411ede60b95464b4749c9e495782
   // center changes only matter when there were no markers before
   if (prev.markers.length === 0 && next.markers.length === 0) {
     return prev.center[0] === next.center[0] && prev.center[1] === next.center[1];
@@ -147,11 +127,7 @@ export function LiveTrackingMap({
   showLog = true,
   isRTL = false,
 }: LiveTrackingMapProps) {
-<<<<<<< HEAD
-  const { latestByDevice, events, connected } = useTrackerStream();
-=======
   const { latestByDevice, events, connected, reconnectAttempt, isRecovering } = useTrackerStream();
->>>>>>> 3d11ff46db27411ede60b95464b4749c9e495782
 
   // Snapshots: keyed by device_id, updated from SSE + REST seed
   const [snapshots, setSnapshots] = useState<Record<string, DeviceSnapshot>>({});
@@ -160,9 +136,6 @@ export function LiveTrackingMap({
   // It must NOT cause the StableMap to re-render.
   const [tick, setTick] = useState(0);
 
-<<<<<<< HEAD
-  const fetchedRef = useRef(false);
-=======
   // Breadcrumb trail — chronological [lat, lon] tuples (max 100 points)
   const [trail, setTrail] = useState<[number, number][]>([]);
   const TRAIL_MAX = 100;
@@ -172,7 +145,6 @@ export function LiveTrackingMap({
 
   // Bind offline-queue auto-flush listener (idempotent)
   useEffect(() => { bindAutoFlush(); }, []);
->>>>>>> 3d11ff46db27411ede60b95464b4749c9e495782
 
   // ── Seed from REST on first mount ──────────────────────────────
   useEffect(() => {
@@ -198,8 +170,6 @@ export function LiveTrackingMap({
       .catch(() => {/* silent – SSE will populate soon */});
   }, [deviceId]);
 
-<<<<<<< HEAD
-=======
   // ── Seed breadcrumb trail from history on first mount ──────────
   useEffect(() => {
     if (!deviceId || historyFetchedRef.current) return;
@@ -215,7 +185,6 @@ export function LiveTrackingMap({
       .catch(() => {/* silent */});
   }, [deviceId]);
 
->>>>>>> 3d11ff46db27411ede60b95464b4749c9e495782
   // ── Merge SSE live data ─────────────────────────────────────────
   useEffect(() => {
     if (!latestByDevice) return;
@@ -233,8 +202,6 @@ export function LiveTrackingMap({
     }
     if (Object.keys(incoming).length > 0) {
       setSnapshots((prev) => ({ ...prev, ...incoming }));
-<<<<<<< HEAD
-=======
 
       // Append new GPS fix to breadcrumb trail
       const target = deviceId
@@ -249,7 +216,6 @@ export function LiveTrackingMap({
           return next.length > TRAIL_MAX ? next.slice(next.length - TRAIL_MAX) : next;
         });
       }
->>>>>>> 3d11ff46db27411ede60b95464b4749c9e495782
     }
   }, [latestByDevice, deviceId]);
 
@@ -333,21 +299,15 @@ export function LiveTrackingMap({
             className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-wider ${
               connected
                 ? 'bg-[#60C10F]/25 text-[#a8e87a] border border-[#60C10F]/40'
-<<<<<<< HEAD
-=======
                 : isRecovering
                 ? 'bg-yellow-500/20 text-yellow-300 border border-yellow-400/30'
->>>>>>> 3d11ff46db27411ede60b95464b4749c9e495782
                 : 'bg-red-500/20 text-red-300 border border-red-400/30'
             }`}
           >
             {connected ? (
               <><Radio className="w-3 h-3" /> {isRTL ? 'متصل' : 'Live'}</>
-<<<<<<< HEAD
-=======
             ) : isRecovering ? (
               <><WifiOff className="w-3 h-3" /> {isRTL ? `محاولة ${reconnectAttempt}…` : `Retry ${reconnectAttempt}…`}</>
->>>>>>> 3d11ff46db27411ede60b95464b4749c9e495782
             ) : (
               <><WifiOff className="w-3 h-3" /> {isRTL ? 'غير متصل' : 'Reconnecting'}</>
             )}
@@ -402,10 +362,7 @@ export function LiveTrackingMap({
             center={defaultCenter}
             markers={mapMarkers}
             zoom={15}
-<<<<<<< HEAD
-=======
             trail={trail.length >= 2 ? trail : undefined}
->>>>>>> 3d11ff46db27411ede60b95464b4749c9e495782
           />
         )}
 
