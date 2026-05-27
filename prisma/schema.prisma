@@ -3,8 +3,405 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id                       String                    @id @default(uuid()) @db.Uuid
+  name                     String
+  email                    String                    @unique
+  phone                    String?
+  passwordHash             String                    @map("password_hash")
+  avatarUrl                String?                   @map("avatar_url")
+  role                     UserRole                  @default(USER)
+  status                   UserStatus                @default(ACTIVE)
+  createdAt                DateTime                  @default(now()) @map("created_at")
+  updatedAt                DateTime                  @updatedAt @map("updated_at")
+  dateOfBirth              String?                   @map("date_of_birth")
+  emailVerifiedAt          DateTime?                 @map("email_verified_at")
+  failedLoginCount         Int                       @default(0) @map("failed_login_count")
+  lastLoginAt              DateTime?                 @map("last_login_at")
+  lockedUntil              DateTime?                 @map("locked_until")
+  username                 String                    @unique @default(cuid())
+  aiJobs                   AiJob[]                   @relation("AiRequestedBy")
+  confirmedMatches         CaseMatch[]               @relation("MatchConfirmedBy")
+  caseStatusChanges        CaseStatusHistory[]       @relation("StatusChangedBy")
+  ownedCases               CaseItem[]                @relation("CaseOwner")
+  conversationParticipants ConversationParticipant[]
+  conversationsCreated     Conversation[]            @relation("ConversationCreatedBy")
+  devices                  Device[]                  @relation("DeviceOwner")
+  profiles                 IdentificationProfile[]   @relation("ProfileOwner")
+  messages                 Message[]                 @relation("MessageSender")
+  notifications            Notification[]
+  sessions                 Session[]
+  preference               UserPreference?
+
+  @@map("users")
+}
+
+model UserPreference {
+  id                   String   @id @default(uuid()) @db.Uuid
+  userId               String   @unique @map("user_id") @db.Uuid
+  language             String   @default("en")
+  darkMode             Boolean  @default(false) @map("dark_mode")
+  notificationsEnabled Boolean  @default(true) @map("notifications_enabled")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_preferences")
+}
+
+model Session {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  tokenHash  String   @map("token_hash")
+  csrfToken  String?  @map("csrf_token")
+  rememberMe Boolean  @default(true) @map("remember_me")
+  userAgent  String?  @map("user_agent")
+  ipHash     String?  @map("ip_hash")
+  expiresAt  DateTime @map("expires_at")
+  lastSeenAt DateTime @default(now()) @map("last_seen_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([tokenHash])
+  @@map("sessions")
+}
+
+model VerificationRequest {
+  id           String    @id @default(uuid()) @db.Uuid
+  purpose      String
+  email        String
+  userId       String?   @map("user_id") @db.Uuid
+  codeHash     String    @map("code_hash")
+  attemptsLeft Int       @default(5) @map("attempts_left")
+  expiresAt    DateTime  @map("expires_at")
+  consumedAt   DateTime? @map("consumed_at")
+  payload      Json?
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  @@index([email, purpose])
+  @@map("verification_requests")
+}
+
+model CaseItem {
+  id                   String              @id @default(uuid()) @db.Uuid
+  ownerUserId          String?             @map("owner_user_id") @db.Uuid
+  referenceCode        String              @unique @map("reference_code")
+  type                 CaseType
+  status               CaseStatus          @default(ACTIVE)
+  category             String?
+  fullName             String?             @map("full_name")
+  estimatedName        String?             @map("estimated_name")
+  age                  Int?
+  gender               String?
+  description          String?
+  clothesColor         String?             @map("clothes_color")
+  conditionNotes       String?             @map("condition_notes")
+  contactPhone         String?             @map("contact_phone")
+  eventTime            DateTime?           @map("event_time")
+  locationText         String?             @map("location_text")
+  latitude             Float?
+  longitude            Float?
+  lastSeenAt           DateTime?           @map("last_seen_at")
+  foundAt              DateTime?           @map("found_at")
+  resolvedAt           DateTime?           @map("resolved_at")
+  deletedAt            DateTime?           @map("deleted_at")
+  createdAt            DateTime            @default(now()) @map("created_at")
+  updatedAt            DateTime            @updatedAt @map("updated_at")
+  candidateInAiJobs    AiJobCandidate[]    @relation("CandidateCase")
+  aiJobs               AiJob[]             @relation("AiJobCase")
+  images               CaseImage[]
+  foundMatches         CaseMatch[]         @relation("FoundCase")
+  missingMatches       CaseMatch[]         @relation("MissingCase")
+  statusHistory        CaseStatusHistory[]
+  owner                User?               @relation("CaseOwner", fields: [ownerUserId], references: [id])
+  relatedConversations Conversation[]
+  relatedNotifications Notification[]
+
+  @@index([ownerUserId])
+  @@index([type, status])
+  @@map("cases")
+}
+
+model CaseImage {
+  id        String   @id @default(uuid()) @db.Uuid
+  caseId    String   @map("case_id") @db.Uuid
+  imageUrl  String   @map("image_url")
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+  case      CaseItem @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@map("case_images")
+}
+
+model CaseStatusHistory {
+  id              String   @id @default(uuid()) @db.Uuid
+  caseId          String   @map("case_id") @db.Uuid
+  status          String
+  note            String?
+  changedByUserId String?  @map("changed_by_user_id") @db.Uuid
+  createdAt       DateTime @default(now()) @map("created_at")
+  case            CaseItem @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  changedByUser   User?    @relation("StatusChangedBy", fields: [changedByUserId], references: [id])
+
+  @@map("case_status_history")
+}
+
+model CaseMatch {
+  id                String      @id @default(uuid()) @db.Uuid
+  missingCaseId     String      @map("missing_case_id") @db.Uuid
+  foundCaseId       String      @map("found_case_id") @db.Uuid
+  source            String      @default("ai_face_match")
+  score             Float
+  status            MatchStatus @default(PENDING)
+  confirmedByUserId String?     @map("confirmed_by_user_id") @db.Uuid
+  confirmedAt       DateTime?   @map("confirmed_at")
+  createdAt         DateTime    @default(now()) @map("created_at")
+  confirmedByUser   User?       @relation("MatchConfirmedBy", fields: [confirmedByUserId], references: [id])
+  foundCase         CaseItem    @relation("FoundCase", fields: [foundCaseId], references: [id], onDelete: Cascade)
+  missingCase       CaseItem    @relation("MissingCase", fields: [missingCaseId], references: [id], onDelete: Cascade)
+
+  @@index([missingCaseId])
+  @@index([foundCaseId])
+  @@map("case_matches")
+}
+
+model IdentificationProfile {
+  id                String                           @id @default(uuid()) @db.Uuid
+  ownerUserId       String?                          @map("owner_user_id") @db.Uuid
+  displayName       String                           @map("display_name")
+  age               Int?
+  category          String?
+  clothesColor      String?                          @map("clothes_color")
+  bloodType         String?                          @map("blood_type")
+  medicalNotes      String?                          @map("medical_notes")
+  lastLocationText  String?                          @map("last_location_text")
+  latitude          Float?
+  longitude         Float?
+  photoUrl          String?                          @map("photo_url")
+  qrPublicToken     String?                          @unique @map("qr_public_token")
+  nfcTagUid         String?                          @unique @map("nfc_tag_uid")
+  isActive          Boolean                          @default(true) @map("is_active")
+  createdAt         DateTime                         @default(now()) @map("created_at")
+  updatedAt         DateTime                         @updatedAt @map("updated_at")
+  deviceLinks       DeviceLink[]
+  emergencyContacts IdentificationEmergencyContact[]
+  owner             User?                            @relation("ProfileOwner", fields: [ownerUserId], references: [id])
+  scanEvents        ScanEvent[]
+
+  @@map("identification_profiles")
+}
+
+model IdentificationEmergencyContact {
+  id          String                @id @default(uuid()) @db.Uuid
+  profileId   String                @map("profile_id") @db.Uuid
+  contactName String                @map("contact_name")
+  relation    String?
+  phone       String
+  createdAt   DateTime              @default(now()) @map("created_at")
+  profile     IdentificationProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@map("identification_emergency_contacts")
+}
+
+model Device {
+  id                    String        @id @default(uuid()) @db.Uuid
+  ownerUserId           String?       @map("owner_user_id") @db.Uuid
+  type                  DeviceType
+  serialNumber          String        @unique @map("serial_number")
+  label                 String?
+  status                DeviceStatus  @default(ACTIVE)
+  batteryLevel          Int?          @map("battery_level")
+  updateIntervalMinutes Int?          @map("update_interval_minutes")
+  trackingEnabled       Boolean       @default(false) @map("tracking_enabled")
+  createdAt             DateTime      @default(now()) @map("created_at")
+  updatedAt             DateTime      @updatedAt @map("updated_at")
+  links                 DeviceLink[]
+  owner                 User?         @relation("DeviceOwner", fields: [ownerUserId], references: [id])
+  gpsLocations          GpsLocation[]
+  scanEvents            ScanEvent[]
+
+  @@map("devices")
+}
+
+model DeviceLink {
+  id         String                @id @default(uuid()) @db.Uuid
+  deviceId   String                @map("device_id") @db.Uuid
+  profileId  String                @map("profile_id") @db.Uuid
+  linkedAt   DateTime              @default(now()) @map("linked_at")
+  unlinkedAt DateTime?             @map("unlinked_at")
+  device     Device                @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  profile    IdentificationProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@map("device_links")
+}
+
+model GpsLocation {
+  id           String   @id @default(uuid()) @db.Uuid
+  deviceId     String   @map("device_id") @db.Uuid
+  latitude     Float
+  longitude    Float
+  batteryLevel Int?     @map("battery_level")
+  recordedAt   DateTime @map("recorded_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+  device       Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@index([deviceId, recordedAt])
+  @@map("gps_locations")
+}
+
+model LocationHistory {
+  id         String   @id @default(uuid()) @db.Uuid
+  /// Raw device identifier — matches device_id sent by A9G or Colota
+  deviceId   String   @map("device_id")
+  lat        Float
+  lon        Float
+  battery    Int?
+  altitude   Float?
+  speed      Float?
+  /// GPS accuracy radius in metres (Colota "acc" field)
+  accuracy   Float?
+  /// Compass bearing 0-360° (Colota "bear" field)
+  bearing    Float?
+  /// "location" | "fall" | "sos"
+  alertType  String   @default("location") @map("alert_type")
+  /// "http" | "mqtt" | "colota" | "batch"
+  source     String   @default("http")
+  /// Actual GPS timestamp (from device). Falls back to receivedAt.
+  recordedAt DateTime @map("recorded_at")
+  /// Server arrival time — always set by backend
+  receivedAt DateTime @default(now()) @map("received_at")
+
+  @@index([deviceId, recordedAt])
+  @@index([recordedAt])
+  @@map("location_history")
+}
+
+model ScanEvent {
+  id        String                 @id @default(uuid()) @db.Uuid
+  profileId String?                @map("profile_id") @db.Uuid
+  deviceId  String?                @map("device_id") @db.Uuid
+  scanType  ScanType               @map("scan_type")
+  scanToken String?                @map("scan_token")
+  latitude  Float?
+  longitude Float?
+  scannedAt DateTime               @default(now()) @map("scanned_at")
+  metadata  Json?
+  device    Device?                @relation(fields: [deviceId], references: [id])
+  profile   IdentificationProfile? @relation(fields: [profileId], references: [id])
+
+  @@map("scan_events")
+}
+
+model AiJob {
+  id                String           @id @default(uuid()) @db.Uuid
+  requestedByUserId String?          @map("requested_by_user_id") @db.Uuid
+  relatedCaseId     String?          @map("related_case_id") @db.Uuid
+  imageUrl          String?          @map("image_url")
+  jobType           AiJobType        @default(RECOGNIZE) @map("job_type")
+  status            AiJobStatus      @default(QUEUED)
+  resultSummary     Json?            @map("result_summary")
+  completedAt       DateTime?        @map("completed_at")
+  createdAt         DateTime         @default(now()) @map("created_at")
+  updatedAt         DateTime         @updatedAt @map("updated_at")
+  candidates        AiJobCandidate[]
+  relatedCase       CaseItem?        @relation("AiJobCase", fields: [relatedCaseId], references: [id])
+  requestedByUser   User?            @relation("AiRequestedBy", fields: [requestedByUserId], references: [id])
+
+  @@map("ai_jobs")
+}
+
+model AiJobCandidate {
+  id              String    @id @default(uuid()) @db.Uuid
+  aiJobId         String    @map("ai_job_id") @db.Uuid
+  candidateCaseId String?   @map("candidate_case_id") @db.Uuid
+  score           Float?
+  metadata        Json?
+  createdAt       DateTime  @default(now()) @map("created_at")
+  aiJob           AiJob     @relation(fields: [aiJobId], references: [id], onDelete: Cascade)
+  candidateCase   CaseItem? @relation("CandidateCase", fields: [candidateCaseId], references: [id], onDelete: Cascade)
+
+  @@map("ai_job_candidates")
+}
+
+model Conversation {
+  id              String                    @id @default(uuid()) @db.Uuid
+  relatedCaseId   String?                   @map("related_case_id") @db.Uuid
+  createdByUserId String?                   @map("created_by_user_id") @db.Uuid
+  createdAt       DateTime                  @default(now()) @map("created_at")
+  participants    ConversationParticipant[]
+  createdByUser   User?                     @relation("ConversationCreatedBy", fields: [createdByUserId], references: [id])
+  relatedCase     CaseItem?                 @relation(fields: [relatedCaseId], references: [id])
+  messages        Message[]
+
+  @@map("conversations")
+}
+
+model ConversationParticipant {
+  id             String       @id @default(uuid()) @db.Uuid
+  conversationId String       @map("conversation_id") @db.Uuid
+  userId         String       @map("user_id") @db.Uuid
+  joinedAt       DateTime     @default(now()) @map("joined_at")
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, userId])
+  @@map("conversation_participants")
+}
+
+model Message {
+  id             String       @id @default(uuid()) @db.Uuid
+  conversationId String       @map("conversation_id") @db.Uuid
+  senderUserId   String?      @map("sender_user_id") @db.Uuid
+  messageType    MessageType  @default(TEXT) @map("message_type")
+  body           String?
+  createdAt      DateTime     @default(now()) @map("created_at")
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderUser     User?        @relation("MessageSender", fields: [senderUserId], references: [id])
+
+  @@index([conversationId, createdAt])
+  @@map("messages")
+}
+
+model Notification {
+  id            String    @id @default(uuid()) @db.Uuid
+  userId        String    @map("user_id") @db.Uuid
+  title         String
+  body          String?
+  type          String?
+  relatedCaseId String?   @map("related_case_id") @db.Uuid
+  isRead        Boolean   @default(false) @map("is_read")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  readAt        DateTime? @map("read_at")
+  relatedCase   CaseItem? @relation(fields: [relatedCaseId], references: [id])
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead, createdAt])
+  @@map("notifications")
+}
+
+model RegisteredTracker {
+  deviceId   String   @id @map("device_id")
+  label      String?
+  ownerEmail String?  @map("owner_email")
+  source     String   @default("manual")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@index([ownerEmail])
+  @@map("registered_trackers")
+}
+
+model KeyValueStore {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("key_value_store")
 }
 
 enum UserRole {
@@ -72,6 +469,7 @@ enum MessageType {
   IMAGE
   SYSTEM
 }
+<<<<<<< HEAD
 
 model User {
   id                       String                    @id @default(uuid()) @db.Uuid
@@ -425,3 +823,5 @@ model Notification {
   @@index([userId, isRead, createdAt])
   @@map("notifications")
 }
+=======
+>>>>>>> 3d11ff46db27411ede60b95464b4749c9e495782

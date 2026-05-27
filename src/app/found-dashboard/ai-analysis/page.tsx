@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { Suspense, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Logo } from '@/components/Logo';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -10,7 +10,7 @@ import { clearPendingAiMatches, getPendingAiRequestId, savePendingAiMatches, wai
 import { useAuth } from '@/components/providers/AuthProvider';
 import { getDisplayUser } from '@/lib/user-display';
 
-export default function AIAnalysisPage() {
+function AIAnalysisContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const requestId = searchParams.get('rid') || '';
@@ -187,5 +187,19 @@ export default function AIAnalysisPage() {
         </div>
       </main>
     </div>
+  );
+}
+
+export default function AIAnalysisPage() {
+  return (
+    <Suspense
+      fallback={(
+        <div className="min-h-screen bg-[#0459a7] text-white flex items-center justify-center font-bold text-lg">
+          Preparing AI analysis...
+        </div>
+      )}
+    >
+      <AIAnalysisContent />
+    </Suspense>
   );
 }

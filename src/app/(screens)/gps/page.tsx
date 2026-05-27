@@ -2,7 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
   BatteryMedium,
@@ -67,7 +67,7 @@ function formFromDevice(device: DeviceItem) {
   };
 }
 
-export default function GPSPage() {
+function GPSPageContent() {
   const searchParams = useSearchParams();
   const initialDeviceId = searchParams.get('deviceId') || '';
   const [devices, setDevices] = useState<DeviceItem[]>([]);
@@ -245,13 +245,16 @@ export default function GPSPage() {
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
-            <button onClick={() => void loadData(selectedId)} className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/10 px-5 py-3 font-bold transition hover:bg-white/20">
-              <RefreshCw className="h-4 w-4" /> Refresh devices
-            </button>
-            <button onClick={handleCreateNew} className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-3 font-black text-[#014CB3] shadow-lg">
-              <Plus className="h-4 w-4" /> New GPS tracker
-            </button>
-          </div>
+              <button onClick={() => void loadData(selectedId)} className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/10 px-5 py-3 font-bold transition hover:bg-white/20">
+                <RefreshCw className="h-4 w-4" /> Refresh devices
+              </button>
+              <button onClick={handleCreateNew} className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-3 font-black text-[#014CB3] shadow-lg">
+                <Plus className="h-4 w-4" /> New GPS tracker
+              </button>
+              <Link href="/tracking/history" className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-[#60C10F] to-[#014CB3] px-5 py-3 font-black text-white shadow-lg hover:shadow-xl transition">
+                <Route className="h-4 w-4" /> History & Geofencing
+              </Link>
+            </div>
         </div>
 
         {message ? <div className="mb-5 rounded-[1.5rem] bg-emerald-50 px-5 py-4 text-sm font-semibold text-emerald-700">{message}</div> : null}
@@ -422,5 +425,19 @@ export default function GPSPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function GPSPage() {
+  return (
+    <Suspense
+      fallback={(
+        <div className="min-h-screen bg-[#0f172a] text-white flex items-center justify-center font-bold text-lg">
+          Loading GPS dashboard...
+        </div>
+      )}
+    >
+      <GPSPageContent />
+    </Suspense>
   );
 }

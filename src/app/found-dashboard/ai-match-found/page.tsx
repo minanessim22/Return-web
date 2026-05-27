@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { Suspense, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Logo } from '@/components/Logo';
@@ -61,7 +61,7 @@ type MaterializedPreviewState = {
   confirmationRequested?: boolean;
 };
 
-export default function AIMatchFoundPage() {
+function AIMatchFoundContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const requestId = searchParams.get('rid') || undefined;
@@ -491,5 +491,19 @@ export default function AIMatchFoundPage() {
         )}
       </main>
     </div>
+  );
+}
+
+export default function AIMatchFoundPage() {
+  return (
+    <Suspense
+      fallback={(
+        <div className="min-h-screen bg-[#0459a7] text-white flex items-center justify-center font-bold text-lg">
+          Loading AI match results...
+        </div>
+      )}
+    >
+      <AIMatchFoundContent />
+    </Suspense>
   );
 }

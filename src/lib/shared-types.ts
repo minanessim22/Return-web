@@ -331,6 +331,23 @@ export interface ConversationRecord {
   updatedAt: string;
 }
 
+export interface Geofence {
+  id: string;
+  ownerUserId: string;
+  deviceId: string;           // which device serial number this fence applies to
+  name: string;
+  lat: number;
+  lon: number;
+  radiusMeters: number;       // circle radius
+  alertOnEnter: boolean;
+  alertOnExit: boolean;
+  isActive: boolean;
+  lastState?: 'inside' | 'outside' | 'unknown';
+  lastCheckedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Store {
   users: StoredUser[];
   sessions: SessionRecord[];
@@ -343,6 +360,7 @@ export interface Store {
   scanEvents: ScanEvent[];
   auditLogs: AuditLogItem[];
   conversations: ConversationRecord[];
+  geofences: Geofence[];
 }
 
 export interface HydratedMatch {

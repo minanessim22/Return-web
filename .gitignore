@@ -3,7 +3,19 @@ node_modules
 out
 dist
 .env*
+!.env.example
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+
+# Old local data files
+src/data/store.json
+src/data/store.json.tmp
+src/data/outbox.json
+src/data/return.db
+src/data/return.db-shm
+src/data/return.db-wal
+
+# Prisma
+tsconfig.tsbuildinfo

@@ -1,6 +1,6 @@
 'use client';
 
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, Circle, useMap, useMapEvents } from 'react-leaflet';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
@@ -535,8 +535,81 @@ function AnimatedMarker({ point }: { point: MarkerPoint }) {
   );
 }
 
+<<<<<<< HEAD
 // ── Map – main exported component ────────────────────────────────
 
+=======
+// ── TrailPolyline – breadcrumb path renderer ─────────────────────
+// Renders the device's recent movement as a fading polyline.
+// The path uses two overlapping lines:
+//   1. A wide, very-transparent halo for visibility on light maps
+//   2. A thinner opaque-blue line for the actual trail
+
+function TrailPolyline({ trail }: { trail: [number, number][] }) {
+  if (trail.length < 2) return null;
+  return (
+    <>
+      {/* Halo — wider, semi-transparent */}
+      <Polyline
+        positions={trail}
+        pathOptions={{
+          color: '#014CB3',
+          weight: 7,
+          opacity: 0.12,
+          lineCap: 'round',
+          lineJoin: 'round',
+        }}
+      />
+      {/* Core trail line */}
+      <Polyline
+        positions={trail}
+        pathOptions={{
+          color: '#014CB3',
+          weight: 3,
+          opacity: 0.55,
+          dashArray: undefined,
+          lineCap: 'round',
+          lineJoin: 'round',
+        }}
+      />
+      {/* Dashed direction indicator */}
+      <Polyline
+        positions={trail}
+        pathOptions={{
+          color: '#60C10F',
+          weight: 1.5,
+          opacity: 0.40,
+          dashArray: '6 10',
+          lineCap: 'round',
+        }}
+      />
+    </>
+  );
+}
+
+// ── Map – main exported component ────────────────────────────────
+
+// ── CircleOverlay – renders geofence circles on the map ──────────
+
+export type CircleOverlay = {
+  center: [number, number];
+  radiusMeters: number;
+  color?: string;
+  label?: string;
+};
+
+// ── ClickHandler – captures map clicks ───────────────────────────
+
+function ClickHandler({ onClick }: { onClick?: (lat: number, lon: number) => void }) {
+  useMapEvents({
+    click(e) {
+      if (onClick) onClick(e.latlng.lat, e.latlng.lng);
+    },
+  });
+  return null;
+}
+
+>>>>>>> 3d11ff46db27411ede60b95464b4749c9e495782
 type Props = {
   center?: [number, number];
   marker?: [number, number];
@@ -557,6 +630,18 @@ type Props = {
    * NOT to the viewer's browser geolocation.
    */
   deviceCenter?: [number, number];
+<<<<<<< HEAD
+=======
+  /**
+   * Ordered array of [lat, lon] tuples representing the device's
+   * recent movement path. Rendered as a semi-transparent breadcrumb trail.
+   */
+  trail?: [number, number][];
+  /** Callback when the user clicks on the map */
+  onMapClick?: (lat: number, lon: number) => void;
+  /** Circles to render (e.g. geofence boundaries) */
+  circles?: CircleOverlay[];
+>>>>>>> 3d11ff46db27411ede60b95464b4749c9e495782
 };
 
 export default function Map({
@@ -568,6 +653,12 @@ export default function Map({
   showControls = false,
   scrollWheelZoom = false,
   deviceCenter,
+<<<<<<< HEAD
+=======
+  trail,
+  onMapClick,
+  circles,
+>>>>>>> 3d11ff46db27411ede60b95464b4749c9e495782
 }: Props) {
   const [mounted, setMounted] = useState(false);
 
@@ -637,6 +728,28 @@ export default function Map({
         <MapResizer />
         <MapViewport center={center} markers={effectiveMarkers} zoom={zoom} />
         <MapControls showControls={showControls} deviceCenter={deviceCenter ?? (effectiveMarkers[0]?.position)} />
+<<<<<<< HEAD
+=======
+        {trail && trail.length >= 2 && <TrailPolyline trail={trail} />}
+        {onMapClick && <ClickHandler onClick={onMapClick} />}
+        {circles && circles.map((c, i) => (
+          <Circle
+            key={`circle-${i}-${c.center[0]}-${c.center[1]}`}
+            center={c.center}
+            radius={c.radiusMeters}
+            pathOptions={{
+              color: c.color || '#014CB3',
+              fillColor: c.color || '#014CB3',
+              fillOpacity: 0.12,
+              weight: 2,
+              opacity: 0.6,
+              dashArray: '6 4',
+            }}
+          >
+            {c.label && <Popup>{c.label}</Popup>}
+          </Circle>
+        ))}
+>>>>>>> 3d11ff46db27411ede60b95464b4749c9e495782
         <TileLayer
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'

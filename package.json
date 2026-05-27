@@ -4,12 +4,14 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "prisma generate && next build",
+    "postinstall": "prisma generate",
     "start": "next start",
     "lint": "next lint",
     "test:smoke": "npx --yes tsx tests/server-smoke.ts && npx --yes tsx tests/ai-device-smoke.ts"
   },
   "dependencies": {
+    "@prisma/client": "^6.19.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "framer-motion": "^12.38.0",
@@ -18,8 +20,7 @@
     "leaflet": "^1.9.4",
     "lucide-react": "^0.511.0",
     "mqtt": "^5.15.1",
-    "next": "15.1.0",
-    "next-auth": "^4.24.13",
+    "next": "^15.5.18",
     "nodemailer": "^7.0.13",
     "qrcode": "^1.5.4",
     "react": "19.0.0",
@@ -36,8 +37,9 @@
     "@types/react-dom": "^19.0.2",
     "autoprefixer": "^10.4.20",
     "eslint": "^9.16.0",
-    "eslint-config-next": "15.1.0",
+    "eslint-config-next": "^15.5.18",
     "postcss": "^8.4.49",
+    "prisma": "^6.19.3",
     "tailwindcss": "^3.4.16",
     "typescript": "^5.7.2"
   }

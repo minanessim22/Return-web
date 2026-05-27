@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
@@ -124,7 +124,7 @@ function validateRequiredReportFields(data: FormState) {
   return null;
 }
 
-export default function ReportMissingPage() {
+function ReportMissingContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, loading } = useAuth();
@@ -864,5 +864,19 @@ export default function ReportMissingPage() {
         </div>
       </main>
     </div>
+  );
+}
+
+export default function ReportMissingPage() {
+  return (
+    <Suspense
+      fallback={(
+        <div className="min-h-screen bg-[#014CB3] text-white flex items-center justify-center font-bold text-lg">
+          Loading report form...
+        </div>
+      )}
+    >
+      <ReportMissingContent />
+    </Suspense>
   );
 }
