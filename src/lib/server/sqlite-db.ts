@@ -242,6 +242,27 @@ export async function listRegisteredTrackers(): Promise<RegisteredTracker[]> {
   }));
 }
 
+export async function listRegisteredTrackersForEmail(email: string): Promise<RegisteredTracker[]> {
+  const normalized = email.trim().toLowerCase();
+  const rows = await prisma.registeredTracker.findMany({
+    where: {
+      ownerEmail: {
+        equals: normalized,
+        mode: 'insensitive'
+      }
+    },
+    orderBy: { createdAt: 'desc' }
+  });
+  return rows.map((row: any) => ({
+    device_id: row.deviceId,
+    label: row.label,
+    owner_email: row.ownerEmail,
+    source: row.source,
+    created_at: row.createdAt.toISOString(),
+    updated_at: row.updatedAt.toISOString()
+  }));
+}
+
 export async function getRegisteredTracker(deviceId: string): Promise<RegisteredTracker | null> {
   const row = await prisma.registeredTracker.findUnique({ where: { deviceId } });
   if (!row) return null;

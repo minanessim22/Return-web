@@ -4,7 +4,8 @@ import { getCurrentUser } from '@/lib/server/session';
 import { addDeviceLocation, createNotification, createOrUpdateDevice, readStore, updateStore } from '@/lib/server/store';
 import { ensureSameOrigin, hashValue, publicBaseUrl } from '@/lib/server/security';
 import { capabilitiesFromDevice, resolveHardwareModelKey } from '@/lib/device-models';
-import type { DeviceType } from '@/lib/shared-types';
+import type { DeviceType, DeviceItem } from '@/lib/shared-types';
+import { listRegisteredTrackersForEmail } from '@/lib/server/sqlite-db';
 
 export const runtime = 'nodejs';
 
@@ -18,16 +19,102 @@ function toOptionalNumber(value: unknown) {
 
 export async function GET() {
   const user = await getCurrentUser();
+
   if (!user) {
-    return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
+    return NextResponse.json(
+      { error: 'Authentication required.' },
+      { status: 401 }
+    );
   }
 
+  const normalizedEmail = user.email?.trim().toLowerCase();
+
   const store = await readStore();
-  const items = store.devices
+
+  // Existing JSON devices
+  const jsonDevices = store.devices
     .filter((item) => item.ownerUserId === user.id)
-    .filter((item) => item.type === 'GPS' || item.type === 'QR' || item.type === 'NFC')
-    .sort((left, right) => (left.updatedAt < right.updatedAt ? 1 : -1));
-  return NextResponse.json({ items });
+    .filter(
+      (item) =>
+        item.type === 'GPS' ||
+        item.type === 'QR' ||
+        item.type === 'NFC'
+    );
+
+  // SQL RegisteredTrackers
+  const trackers = normalizedEmail
+    ? await listRegisteredTrackersForEmail(normalizedEmail)
+    : [];
+
+  const jsonDeviceMap = new Map(
+    jsonDevices.map((d) => [
+      d.serialNumber || d.id,
+      d
+    ])
+  );
+
+  const sqlDevices = trackers
+    .filter((tracker) => tracker.device_id)
+    .map((tracker) => {
+      // Try matching existing JSON device
+      const existing = jsonDeviceMap.get(tracker.device_id);
+
+      if (existing) {
+        return existing;
+      }
+
+      // Create normalized frontend-compatible device
+      return {
+        id: tracker.device_id,
+        serialNumber: tracker.device_id,
+        label: tracker.label || tracker.device_id,
+        name: tracker.label || tracker.device_id,
+        type: 'GPS',
+        ownerUserId: user.id,
+        trackingEnabled: true,
+        status: 'ACTIVE',
+        locationHistory: [],
+        createdAt: tracker.created_at,
+        updatedAt:
+          tracker.updated_at ||
+          tracker.created_at ||
+          new Date().toISOString()
+      } as DeviceItem;
+    });
+
+  // Merge + dedupe
+  const merged = [...jsonDevices];
+
+  for (const device of sqlDevices) {
+    const exists = merged.some((item) => {
+      const sameId =
+        item.id &&
+        device.id &&
+        item.id === device.id;
+
+      const sameSerial =
+        item.serialNumber &&
+        device.serialNumber &&
+        item.serialNumber === device.serialNumber;
+
+      return sameId || sameSerial;
+    });
+
+    if (!exists) {
+      merged.push(device);
+    }
+  }
+
+  // Sort latest first
+  merged.sort((a, b) => {
+    const left = a.updatedAt || a.createdAt || '';
+    const right = b.updatedAt || b.createdAt || '';
+    return left < right ? 1 : -1;
+  });
+
+  return NextResponse.json({
+    items: merged
+  });
 }
 
 export async function POST(request: Request) {
