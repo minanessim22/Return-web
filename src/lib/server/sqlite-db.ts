@@ -13,10 +13,10 @@ export async function readRawStoreFromSqlite(): Promise<any> {
     if (row && row.value) {
       return JSON.parse(row.value);
     }
-    return {};
+    return null;
   } catch (err) {
     console.error('[Supabase DB] Failed to read store:', err);
-    return {};
+    return null;
   }
 }
 
