@@ -409,7 +409,7 @@ export function TrackingHistoryPanel({ deviceId, deviceLabel, embedded = false }
               <EmptyState icon={Navigation} title="No trail yet" subtitle="Capture at least one GPS point to see the live location and breadcrumb trail." />
             ) : (
               <>
-                <div className="rounded-2xl overflow-hidden border border-gray-200 shadow-lg" style={{ height: '420px' }}>
+                <div className="rounded-2xl overflow-hidden border border-gray-200 shadow-lg" style={{ height: '350px' }}>
                   <DynamicMap
                     center={mapCenter}
                     markers={trailMarkers}
