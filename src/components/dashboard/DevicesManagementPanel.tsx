@@ -477,7 +477,7 @@ export function DevicesManagementPanel({ isRTL = false }: { isRTL?: boolean }) {
       {/* ── Live GPS Map – always visible ──────────────────────── */}
       <LiveTrackingMap
         height="420px"
-        showLog={true}
+        showLog={false}
         isRTL={isRTL}
       />
 
