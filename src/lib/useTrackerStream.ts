@@ -22,6 +22,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { supabase } from '@/lib/supabaseClient';
 
 export interface TrackerEvent {
   device_id: string;
@@ -53,7 +54,7 @@ function calcDelay(attempt: number): number {
   return Math.round(exp + jitter);
 }
 
-// ── Hook ──────────────────────────────────────────────────────────
+// ── Hook ──────────────────────────────────────────────────────────────────────────────────────────
 
 export function useTrackerStream() {
   const [events, setEvents] = useState<TrackerEvent[]>([]);
@@ -153,15 +154,82 @@ export function useTrackerStream() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    connect();
+    if (supabase) {
+      console.log('[TrackerStream] Connecting to Supabase Realtime...');
+      
+      const channel = supabase
+        .channel('location-history-changes')
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'location_history' },
+          (payload) => {
+            try {
+              const row = payload.new;
+              const data: TrackerEvent = {
+                device_id: String(row.device_id),
+                lat: Number(row.lat),
+                lon: Number(row.lon),
+                battery: row.battery !== null && row.battery !== undefined ? Number(row.battery) : undefined,
+                timestamp: row.recorded_at,
+                receivedAt: row.received_at || new Date().toISOString(),
+                topic: `supabase/realtime/${row.device_id}`,
+                alertType: row.alert_type || 'location',
+              };
 
-    return () => {
-      if (esRef.current) {
-        esRef.current.close();
-        esRef.current = null;
-      }
-      clearRetry();
-    };
+              setEvents((prev) => {
+                const next = [data, ...prev];
+                return next.length > MAX_EVENTS ? next.slice(0, MAX_EVENTS) : next;
+              });
+
+              setLatestByDevice((prev) => ({
+                ...prev,
+                [data.device_id]: data,
+              }));
+
+              if (data.alertType === 'fall') {
+                setFallAlerts((prev) => {
+                  const next = [data, ...prev];
+                  return next.length > 50 ? next.slice(0, 50) : next;
+                });
+              }
+            } catch (err) {
+              console.error('[TrackerStream] Error handling Supabase realtime payload:', err);
+            }
+          }
+        )
+        .subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            console.log('[TrackerStream] Supabase Realtime connected ✓');
+            setConnected(true);
+            setIsRecovering(false);
+            setReconnectAttempt(0);
+          } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+            console.warn('[TrackerStream] Supabase Realtime connection failed. Falling back to EventSource SSE...');
+            setConnected(false);
+            // Fallback to SSE if Supabase Realtime fails
+            connect();
+          }
+        });
+
+      return () => {
+        void channel.unsubscribe();
+        if (esRef.current) {
+          esRef.current.close();
+          esRef.current = null;
+        }
+        clearRetry();
+      };
+    } else {
+      console.log('[TrackerStream] Supabase keys not set. Falling back to EventSource SSE.');
+      connect();
+      return () => {
+        if (esRef.current) {
+          esRef.current.close();
+          esRef.current = null;
+        }
+        clearRetry();
+      };
+    }
   }, [connect]);
 
   /** Dismiss a specific fall alert by index */

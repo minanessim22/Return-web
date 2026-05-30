@@ -186,6 +186,11 @@ function startMqttClient() {
   const state = getGlobal();
   if (state.client) return; // already running
 
+  if (process.env.DISABLE_MQTT === 'true' || process.env.VERCEL === '1') {
+    console.log('[MQTT] MQTT client is disabled in serverless/Vercel or by configuration.');
+    return;
+  }
+
   console.log(`[MQTT] Connecting to ${MQTT_BROKER_URL} …`);
 
   // التعديل الأهم: توليد Client ID عشوائي عشان نمنع الـ Connection Flapping
