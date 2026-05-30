@@ -147,9 +147,25 @@ export async function getLocationHistory(deviceId: string, fromIso?: string, toI
   const to = toIso ? new Date(toIso) : new Date();
   const safeLimit = Math.min(Math.max(1, limit), 2000);
 
+  // If the deviceId is a database UUID, resolve it to the raw serial number
+  let resolvedDeviceId = deviceId;
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(deviceId);
+  if (isUuid) {
+    try {
+      const dev = await prisma.device.findUnique({
+        where: { id: deviceId }
+      });
+      if (dev && dev.serialNumber) {
+        resolvedDeviceId = dev.serialNumber;
+      }
+    } catch (err) {
+      console.error('Failed to resolve device UUID to serial number:', err);
+    }
+  }
+
   const results = await prisma.locationHistory.findMany({
     where: {
-      deviceId,
+      deviceId: resolvedDeviceId,
       recordedAt: { gte: from, lte: to }
     },
     orderBy: { recordedAt: 'asc' },

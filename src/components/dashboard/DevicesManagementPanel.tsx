@@ -248,10 +248,10 @@ export function DevicesManagementPanel({ isRTL = false }: { isRTL?: boolean }) {
   const linkedProfilesCount = useMemo(() => devices.filter((item) => item.linkedProfileId).length, [devices]);
   const activeDevicesCount = useMemo(() => devices.filter((item) => item.status === 'ACTIVE').length, [devices]);
   const gpsCapableDevices = useMemo(() => devices.filter((device) => device.type === 'GPS' || device.supportsGps), [devices]);
-  const selectedHistoryDevice = useMemo(() => gpsCapableDevices.find((device) => device.id === historyDeviceId) ?? null, [gpsCapableDevices, historyDeviceId]);
+  const selectedHistoryDevice = useMemo(() => gpsCapableDevices.find((device) => device.serialNumber === historyDeviceId) ?? null, [gpsCapableDevices, historyDeviceId]);
 
   useEffect(() => {
-    if (historyDeviceId && !gpsCapableDevices.some((device) => device.id === historyDeviceId)) {
+    if (historyDeviceId && !gpsCapableDevices.some((device) => device.serialNumber === historyDeviceId)) {
       setHistoryDeviceId('');
     }
   }, [gpsCapableDevices, historyDeviceId]);
@@ -500,7 +500,7 @@ export function DevicesManagementPanel({ isRTL = false }: { isRTL?: boolean }) {
             >
               <option value="">{t.historySelectPlaceholder}</option>
               {gpsCapableDevices.map((device) => (
-                <option key={device.id} value={device.id}>
+                <option key={device.id} value={device.serialNumber}>
                   {device.label} · {device.serialNumber}
                 </option>
               ))}
