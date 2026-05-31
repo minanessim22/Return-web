@@ -9,6 +9,37 @@ import { prisma } from './db';
 
 // ── Admin Table Summary ──────────────────────────────────────────
 
+function getModelColumns(modelName: string): string[] {
+  const defaultColumnsMap: Record<string, string[]> = {
+    User: ['id', 'name', 'email', 'phone', 'role', 'status', 'createdAt', 'updatedAt', 'username'],
+    UserPreference: ['id', 'userId', 'language', 'darkMode', 'notificationsEnabled', 'createdAt', 'updatedAt'],
+    Session: ['id', 'userId', 'tokenHash', 'rememberMe', 'expiresAt', 'lastSeenAt', 'createdAt'],
+    VerificationRequest: ['id', 'purpose', 'email', 'userId', 'codeHash', 'attemptsLeft', 'expiresAt', 'createdAt'],
+    CaseItem: ['id', 'referenceCode', 'type', 'status', 'fullName', 'createdAt', 'updatedAt'],
+    CaseImage: ['id', 'caseId', 'imageUrl', 'sortOrder', 'createdAt'],
+    CaseStatusHistory: ['id', 'caseId', 'status', 'note', 'changedByUserId', 'createdAt'],
+    CaseMatch: ['id', 'missingCaseId', 'foundCaseId', 'source', 'score', 'status', 'createdAt'],
+    IdentificationProfile: ['id', 'ownerUserId', 'displayName', 'isActive', 'createdAt', 'updatedAt'],
+    IdentificationEmergencyContact: ['id', 'profileId', 'contactName', 'phone', 'createdAt'],
+    Device: ['id', 'ownerUserId', 'type', 'serialNumber', 'label', 'status', 'createdAt', 'updatedAt'],
+    DeviceLink: ['id', 'deviceId', 'profileId', 'linkedAt'],
+    GpsLocation: ['id', 'deviceId', 'latitude', 'longitude', 'recordedAt', 'createdAt'],
+    LocationHistory: ['id', 'deviceId', 'lat', 'lon', 'alertType', 'source', 'recordedAt', 'receivedAt'],
+    ScanEvent: ['id', 'profileId', 'deviceId', 'scanType', 'scanToken', 'scannedAt'],
+    AiJob: ['id', 'requestedByUserId', 'relatedCaseId', 'jobType', 'status', 'createdAt'],
+    AiJobCandidate: ['id', 'aiJobId', 'candidateCaseId', 'score', 'createdAt'],
+    Conversation: ['id', 'relatedCaseId', 'createdByUserId', 'createdAt'],
+    ConversationParticipant: ['id', 'conversationId', 'userId', 'joinedAt'],
+    Message: ['id', 'conversationId', 'senderUserId', 'messageType', 'body', 'createdAt'],
+    Notification: ['id', 'userId', 'title', 'isRead', 'createdAt'],
+    RegisteredTracker: ['deviceId', 'label', 'ownerEmail', 'source', 'createdAt', 'updatedAt'],
+    KeyValueStore: ['key', 'value', 'updatedAt'],
+    Geofence: ['id', 'ownerUserId', 'deviceId', 'name', 'lat', 'lon', 'radiusMeters', 'createdAt'],
+    AuditLog: ['id', 'userId', 'eventType', 'severity', 'createdAt']
+  };
+  return defaultColumnsMap[modelName] || ['id'];
+}
+
 export async function getTableSummary() {
   const models = [
     { name: 'User', table: 'users' },
@@ -39,7 +70,7 @@ export async function getTableSummary() {
       name: m.name,
       storeKey: m.table,
       count,
-      columns: []
+      columns: getModelColumns(m.name).map(col => ({ name: col, type: 'text' }))
     });
   }
   return summary;
