@@ -82,7 +82,11 @@ function emit(entry: LogEntry): void {
       entry.userId && `user=${entry.userId}`,
       entry.route && `route=${entry.route}`,
     ].filter(Boolean).join(' ');
-    const line = `${prefix} ${entry.message}${ctx ? ` | ${ctx}` : ''}`;
+    const extraKeys = Object.keys(entry).filter(
+      (k) => !['level', 'message', 'timestamp', 'category', 'requestId', 'ip', 'userId', 'route', 'userAgent'].includes(k)
+    );
+    const extraStr = extraKeys.length > 0 ? ` | meta=${JSON.stringify(extraKeys.reduce((acc, k) => ({ ...acc, [k]: entry[k] }), {}))}` : '';
+    const line = `${prefix} ${entry.message}${ctx ? ` | ${ctx}` : ''}${extraStr}`;
     if (entry.level === 'error') {
       console.error(line);
     } else if (entry.level === 'warn' || entry.level === 'security') {

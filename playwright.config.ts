@@ -5,6 +5,7 @@ import { defineConfig, devices } from '@playwright/test';
  */
 export default defineConfig({
   testDir: './tests/e2e',
+  timeout: 60000, // 60 seconds per test to prevent database-related E2E timeouts
   fullyParallel: false, // Run sequentially to avoid DB lock/race conditions
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,

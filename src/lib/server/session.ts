@@ -87,7 +87,8 @@ export function clearSessionCookie(response: NextResponse) {
     sameSite: 'lax',
     secure: process.env.NODE_ENV === 'production',
     path: '/',
-    expires: new Date(0)
+    expires: new Date(0),
+    maxAge: 0
   });
 }
 
