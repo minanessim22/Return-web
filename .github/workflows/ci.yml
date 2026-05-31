@@ -42,19 +42,19 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Generate Prisma Client
-        run: npx prisma generate
+        run: npx --no-install prisma generate
 
       - name: Validate Prisma Schema
         env:
           DATABASE_URL: "postgresql://mock:mock@localhost:5432/mock"
           DIRECT_URL: "postgresql://mock:mock@localhost:5432/mock"
-        run: npx prisma validate
+        run: npx --no-install prisma validate
 
       - name: Run Database Migrations/Push (Test DB Setup)
         env:
           DATABASE_URL: postgresql://postgres:postgrespassword@localhost:5432/return_test?schema=public
           DIRECT_URL: postgresql://postgres:postgrespassword@localhost:5432/return_test?schema=public
-        run: npx prisma db push --skip-generate
+        run: npx --no-install prisma db push --skip-generate
 
       - name: Run TypeScript Type Check
         run: npx tsc --noEmit

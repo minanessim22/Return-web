@@ -28,4 +28,4 @@ jobs:
         env:
           DATABASE_URL: "postgresql://mock:mock@localhost:5432/mock"
           DIRECT_URL: "postgresql://mock:mock@localhost:5432/mock"
-        run: npx prisma validate
+        run: npx prisma@6.19.3 validate
