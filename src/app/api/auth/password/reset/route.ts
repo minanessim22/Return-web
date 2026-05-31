@@ -1,7 +1,9 @@
 import { checkRateLimit } from '@/lib/server/rate-limit';
 import { apiError, apiJson, readJsonBody, requireSameOrigin } from '@/lib/server/http';
-import { getClientIp, getPasswordStrengthMessage, getUserAgent, hashValue, isStrongPassword } from '@/lib/server/security';
-import { hashPassword, recordAuditLog, updateStore, verifyOneTimeCode } from '@/lib/server/store';
+import { getClientIp, getPasswordStrengthMessage, isStrongPassword } from '@/lib/server/security';
+import { hashPassword } from '@/lib/server/auth-helpers';
+import { verifyOneTimeCode } from '@/lib/server/verification';
+import { prisma } from '@/lib/server/db';
 
 export const runtime = 'nodejs';
 
@@ -14,7 +16,6 @@ export async function POST(request: Request) {
   const code = String(body.code || '').trim();
   const password = String(body.password || '');
   const ip = getClientIp(request) || 'unknown';
-  const userAgent = getUserAgent(request);
 
   const rate = checkRateLimit(`password-reset:${ip}:${email.toLowerCase()}`, 10, 15 * 60 * 1000);
   if (!rate.allowed) {
@@ -24,39 +25,37 @@ export async function POST(request: Request) {
   if (!isStrongPassword(password)) return apiError(400, getPasswordStrengthMessage(password));
 
   try {
-    await updateStore((draft) => {
-      const verification = verifyOneTimeCode(draft, { purpose: 'RESET_PASSWORD', email, code });
-      if (!verification.ok) throw new Error(verification.reason);
+    const verification = await verifyOneTimeCode({ purpose: 'RESET_PASSWORD', email, code });
+    if (!verification.ok) {
+      return apiError(400, verification.reason);
+    }
 
-      const userId = verification.entry.userId || String(verification.entry.payload?.userId || '');
-      const user = draft.users.find((entry) => entry.id === userId || entry.email === verification.entry.email);
-      if (!user) throw new Error('ACCOUNT_NOT_FOUND');
+    const userId = verification.entry.userId || (verification.entry.payload as any)?.userId;
+    const user = await prisma.user.findFirst({
+      where: {
+        OR: [
+          ...(userId ? [{ id: userId }] : []),
+          { email: { equals: email, mode: 'insensitive' } }
+        ]
+      }
+    });
 
-      user.passwordHash = hashPassword(password);
-      user.failedLoginCount = 0;
-      user.lockedUntil = undefined;
-      if (user.status === 'LOCKED') user.status = 'ACTIVE';
-      user.updatedAt = new Date().toISOString();
+    if (!user) {
+      return apiError(404, 'No account was found for this reset request.');
+    }
 
-      recordAuditLog(draft, {
-        event: 'auth_password_reset_completed',
-        severity: 'info',
-        userId: user.id,
-        ipHash: hashValue(ip),
-        userAgent,
-        details: { email: user.email }
-      });
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash: hashPassword(password),
+        failedLoginCount: 0,
+        lockedUntil: null,
+        status: 'ACTIVE'
+      }
     });
   } catch (error) {
-    if (error instanceof Error) {
-      if (['No active verification request was found.', 'This code has expired. Please request a new one.', 'Too many invalid attempts. Please request a new code.', 'The verification code is incorrect.'].includes(error.message)) {
-        return apiError(400, error.message);
-      }
-      if (error.message === 'ACCOUNT_NOT_FOUND') {
-        return apiError(404, 'No account was found for this reset request.');
-      }
-    }
-    throw error;
+    console.error('[PasswordReset] Reset error:', error);
+    return apiError(500, 'An unexpected error occurred during password reset.');
   }
 
   return apiJson({ success: true, message: 'Password updated successfully. You can now sign in with your new password.' });

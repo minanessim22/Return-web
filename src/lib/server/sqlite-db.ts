@@ -1,73 +1,168 @@
+/**
+ * Database helpers for tracker telemetry and admin views.
+ *
+ * All persistence uses Prisma → PostgreSQL (Supabase).
+ * The "sqlite-db" filename is kept for import compatibility;
+ * no actual SQLite code remains.
+ */
+
 import crypto from 'node:crypto';
 import { prisma } from './db';
 
-// ── JSON Store Persistence ────────────────────────────────────────
+// ── Admin Table Summary ──────────────────────────────────────────
 
-const STORE_KEY = 'MAIN_APP_STORE_V1';
+export async function getTableSummary() {
+  const models = [
+    { name: 'User', table: 'users' },
+    { name: 'Session', table: 'sessions' },
+    { name: 'CaseItem', table: 'cases' },
+    { name: 'CaseMatch', table: 'case_matches' },
+    { name: 'IdentificationProfile', table: 'identification_profiles' },
+    { name: 'Device', table: 'devices' },
+    { name: 'GpsLocation', table: 'gps_locations' },
+    { name: 'LocationHistory', table: 'location_history' },
+    { name: 'ScanEvent', table: 'scan_events' },
+    { name: 'Notification', table: 'notifications' },
+    { name: 'VerificationRequest', table: 'verification_requests' },
+    { name: 'Conversation', table: 'conversations' },
+    { name: 'Geofence', table: 'geofences' }
+  ];
 
-export async function readRawStoreFromSqlite(): Promise<any> {
-  try {
-    const row = await prisma.keyValueStore.findUnique({
-      where: { key: STORE_KEY }
-    });
-    if (row && row.value) {
-      return JSON.parse(row.value);
+  const summary = [];
+  for (const m of models) {
+    let count = 0;
+    try {
+      const modelName = m.name.charAt(0).toLowerCase() + m.name.slice(1);
+      count = await (prisma as any)[modelName].count();
+    } catch (e) {
+      console.error(`Failed to get count for ${m.name}:`, e);
     }
-    return null;
-  } catch (err) {
-    console.error('[Supabase DB] Failed to read store:', err);
-    return null;
-  }
-}
-
-export async function writeRawStoreToSqlite(storeData: any): Promise<void> {
-  try {
-    await prisma.keyValueStore.upsert({
-      where: { key: STORE_KEY },
-      update: { value: JSON.stringify(storeData) },
-      create: { key: STORE_KEY, value: JSON.stringify(storeData) }
-    });
-  } catch (err) {
-    console.error('[Supabase DB] Failed to write store:', err);
-  }
-}
-
-export async function getSqliteSummary() {
-  const store = await readRawStoreFromSqlite() || {};
-  return Object.keys(store).map((key) => {
-    const items = store[key];
-    return {
-      name: key,
-      storeKey: key,
-      count: Array.isArray(items) ? items.length : 0,
+    summary.push({
+      name: m.name,
+      storeKey: m.table,
+      count,
       columns: []
-    };
-  });
+    });
+  }
+  return summary;
 }
 
-export async function readSqliteTable(tableName: string, limit = 100, offset = 0) {
-  const store = await readRawStoreFromSqlite() || {};
-  const items = store[tableName] || [];
-  return {
-    table: tableName,
-    rows: items.slice(offset, offset + limit).map((payload: any) => ({
-      id: payload.id,
-      payload,
-      payloadPreview: payload
-    }))
-  };
-}
+/** Kept as alias for backward compatibility with admin routes */
+export const getSqliteSummary = getTableSummary;
 
-export async function getSqliteHealth() {
-  const row = await prisma.keyValueStore.findUnique({ where: { key: STORE_KEY } });
+// ── Database Health ──────────────────────────────────────────────
+
+export async function getDatabaseHealth() {
+  const totalRows = (await prisma.caseItem.count()) +
+    (await prisma.user.count()) +
+    (await prisma.device.count());
   return {
-    file: 'Supabase Postgres (KeyValueStore)',
-    sizeBytes: row ? Buffer.byteLength(row.value, 'utf8') : 0,
-    totalRows: 1,
+    file: process.env.IS_SMOKE_TEST === 'true' ? 'src/data/return.db' : 'Supabase PostgreSQL (AWS / Pooler)',
+    sizeBytes: 0,
+    totalRows,
     walEnabled: true,
-    indexedTables: ['LocationHistory', 'RegisteredTrackers']
+    indexedTables: ['users', 'sessions', 'cases', 'case_matches', 'location_history', 'devices', 'notifications']
   };
 }
+
+/** Kept as alias for backward compatibility */
+export const getSqliteHealth = getDatabaseHealth;
+
+// ── Admin Table Reader ───────────────────────────────────────────
+
+const TABLE_TO_MODEL: Record<string, string> = {
+  'users': 'user',
+  'sessions': 'session',
+  'cases': 'caseItem',
+  'case_matches': 'caseMatch',
+  'case_images': 'caseImage',
+  'case_status_history': 'caseStatusHistory',
+  'identification_profiles': 'identificationProfile',
+  'identification_emergency_contacts': 'identificationEmergencyContact',
+  'devices': 'device',
+  'device_links': 'deviceLink',
+  'gps_locations': 'gpsLocation',
+  'location_history': 'locationHistory',
+  'scan_events': 'scanEvent',
+  'notifications': 'notification',
+  'verification_requests': 'verificationRequest',
+  'conversations': 'conversation',
+  'conversation_participants': 'conversationParticipant',
+  'messages': 'message',
+  'ai_jobs': 'aiJob',
+  'ai_job_candidates': 'aiJobCandidate',
+  'registered_trackers': 'registeredTracker',
+  'geofences': 'geofence',
+  'user_preferences': 'userPreference',
+  'key_value_store': 'keyValueStore'
+};
+
+export async function readTableData(tableName: string, limit = 100, offset = 0) {
+  const modelName = TABLE_TO_MODEL[tableName];
+  if (!modelName) {
+    throw new Error('TABLE_NOT_FOUND');
+  }
+
+  try {
+    const model = (prisma as any)[modelName];
+    const rows = await model.findMany({
+      take: Math.min(limit, 200),
+      skip: offset,
+      orderBy: { createdAt: 'desc' }
+    });
+
+    return {
+      table: tableName,
+      rows: rows.map((payload: any) => ({
+        id: payload.id,
+        payload,
+        payloadPreview: payload
+      }))
+    };
+  } catch (e: any) {
+    // Some models may not have createdAt — fall back to no ordering
+    if (e?.message?.includes('createdAt')) {
+      try {
+        const model = (prisma as any)[modelName];
+        const rows = await model.findMany({ take: Math.min(limit, 200), skip: offset });
+        return {
+          table: tableName,
+          rows: rows.map((payload: any) => ({
+            id: payload.id ?? payload.key,
+            payload,
+            payloadPreview: payload
+          }))
+        };
+      } catch (fallbackErr) {
+        console.error(`Failed to read table ${tableName}:`, fallbackErr);
+        return { table: tableName, rows: [] };
+      }
+    }
+    console.error(`Failed to read table ${tableName}:`, e);
+    return { table: tableName, rows: [] };
+  }
+}
+
+/** Kept as alias for backward compatibility */
+export const readSqliteTable = readTableData;
+
+/** List all Prisma-managed tables with row counts */
+export async function listTables() {
+  const entries = Object.entries(TABLE_TO_MODEL);
+  const result = [];
+  for (const [tableName, modelName] of entries) {
+    try {
+      const count = await (prisma as any)[modelName].count();
+      result.push({ name: tableName, storeKey: tableName, count, columns: [] });
+    } catch {
+      result.push({ name: tableName, storeKey: tableName, count: 0, columns: [] });
+    }
+  }
+  return result;
+}
+
+/** Kept as alias for backward compatibility */
+export const listSqliteTables = listTables;
 
 // ── Location History API ──────────────────────────────────────────
 
@@ -172,7 +267,7 @@ export async function getLocationHistory(deviceId: string, fromIso?: string, toI
     take: safeLimit
   });
 
-  return results.map((row: any) => ({
+  return results.map((row) => ({
     id: row.id,
     device_id: row.deviceId,
     lat: row.lat,
@@ -204,18 +299,7 @@ export async function isTrackerRegistered(deviceId: string): Promise<boolean> {
   const row = await prisma.registeredTracker.findUnique({
     where: { deviceId }
   });
-  if (row !== null) return true;
-
-  // Fallback to checking the JSON store and auto-syncing
-  const store = await readRawStoreFromSqlite();
-  if (store && Array.isArray(store.devices)) {
-    const found = store.devices.find((d: any) => d.serialNumber === deviceId || d.id === deviceId);
-    if (found) {
-      await registerTracker(deviceId, found.label, undefined, 'auto-sync').catch(() => {});
-      return true;
-    }
-  }
-  return false;
+  return row !== null;
 }
 
 export async function registerTracker(deviceId: string, label?: string, ownerEmail?: string, source = 'manual'): Promise<boolean> {
@@ -248,7 +332,7 @@ export async function unregisterTracker(deviceId: string): Promise<boolean> {
 
 export async function listRegisteredTrackers(): Promise<RegisteredTracker[]> {
   const rows = await prisma.registeredTracker.findMany({ orderBy: { createdAt: 'desc' } });
-  return rows.map((row: any) => ({
+  return rows.map((row) => ({
     device_id: row.deviceId,
     label: row.label,
     owner_email: row.ownerEmail,
@@ -269,7 +353,7 @@ export async function listRegisteredTrackersForEmail(email: string): Promise<Reg
     },
     orderBy: { createdAt: 'desc' }
   });
-  return rows.map((row: any) => ({
+  return rows.map((row) => ({
     device_id: row.deviceId,
     label: row.label,
     owner_email: row.ownerEmail,

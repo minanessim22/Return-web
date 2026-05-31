@@ -1,7 +1,8 @@
+import { randomBytes } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/server/session';
 import { ensureSameOrigin, publicBaseUrl } from '@/lib/server/security';
-import { readStore } from '@/lib/server/store';
+import { prisma } from '@/lib/server/db';
 
 export const runtime = 'nodejs';
 
@@ -14,11 +15,24 @@ export async function POST(request: Request, context: { params: Promise<{ profil
     return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
   }
   const { profileId } = await context.params;
-  const store = await readStore();
-  const profile = store.identificationProfiles.find((item) => item.id === profileId && item.ownerUserId === user.id);
+
+  let profile = await prisma.identificationProfile.findFirst({
+    where: { id: profileId, ownerUserId: user.id }
+  });
+
   if (!profile) {
     return NextResponse.json({ error: 'Profile not found.' }, { status: 404 });
   }
-  const publicUrl = `${publicBaseUrl(request)}/identify/${profile.qrPublicToken}`;
-  return NextResponse.json({ token: profile.qrPublicToken, publicUrl });
+
+  let token = profile.qrPublicToken;
+  if (!token) {
+    token = `qr_${randomBytes(6).toString('hex')}`;
+    profile = await prisma.identificationProfile.update({
+      where: { id: profileId },
+      data: { qrPublicToken: token }
+    });
+  }
+
+  const publicUrl = `${publicBaseUrl(request)}/identify/${token}`;
+  return NextResponse.json({ token, publicUrl });
 }

@@ -34,7 +34,7 @@ import { ensureMqttBridge, getMqttEmitter } from '@/lib/server/mqtt-bridge';
 import type { TrackerLocationEvent } from '@/lib/server/mqtt-bridge';
 import { insertLocationHistoryBatch, isTrackerRegistered } from '@/lib/server/sqlite-db';
 import type { LocationHistoryRow } from '@/lib/server/sqlite-db';
-import { updateStore } from '@/lib/server/store';
+import { prisma } from '@/lib/server/db';
 
 // ── Geofence helpers ──────────────────────────────────────────────
 
@@ -50,23 +50,49 @@ function haversineMeters(lat1: number, lon1: number, lat2: number, lon2: number)
 
 async function checkGeofences(deviceId: string, lat: number, lon: number) {
   try {
-    await updateStore((store) => {
-      const fences = store.geofences.filter((g) => g.isActive && g.deviceId === deviceId);
-      for (const fence of fences) {
-        const dist = haversineMeters(lat, lon, fence.lat, fence.lon);
-        const isInside = dist <= fence.radiusMeters;
-        const prevState = fence.lastState ?? 'unknown';
-        fence.lastState = isInside ? 'inside' : 'outside';
-        fence.lastCheckedAt = new Date().toISOString();
-        if (prevState === 'unknown') continue;
-        if (isInside && prevState === 'outside' && fence.alertOnEnter) {
-          store.notifications.unshift({ id: `notif_${Date.now()}`, userId: fence.ownerUserId, title: `📍 دخل النطاق: ${fence.name}`, body: `الجهاز ${deviceId} دخل نطاق "${fence.name}"`, type: 'geofence_enter', isRead: false, createdAt: new Date().toISOString() } as any);
-        } else if (!isInside && prevState === 'inside' && fence.alertOnExit) {
-          store.notifications.unshift({ id: `notif_${Date.now()}`, userId: fence.ownerUserId, title: `🚪 خرج من النطاق: ${fence.name}`, body: `الجهاز ${deviceId} خرج من نطاق "${fence.name}"`, type: 'geofence_exit', isRead: false, createdAt: new Date().toISOString() } as any);
-        }
-      }
+    const fences = await prisma.geofence.findMany({
+      where: { isActive: true, deviceId }
     });
-  } catch { /* non-fatal */ }
+
+    for (const fence of fences) {
+      const dist = haversineMeters(lat, lon, fence.lat, fence.lon);
+      const isInside = dist <= fence.radiusMeters;
+      const prevState = fence.lastState ?? 'unknown';
+      const newState = isInside ? 'inside' : 'outside';
+
+      await prisma.geofence.update({
+        where: { id: fence.id },
+        data: {
+          lastState: newState,
+          lastCheckedAt: new Date()
+        }
+      });
+
+      if (prevState === 'unknown') continue;
+
+      if (isInside && prevState === 'outside' && fence.alertOnEnter) {
+        await prisma.notification.create({
+          data: {
+            userId: fence.ownerUserId,
+            title: `📍 دخل النطاق: ${fence.name}`,
+            body: `الجهاز ${deviceId} دخل نطاق "${fence.name}"`,
+            type: 'geofence_enter'
+          }
+        });
+      } else if (!isInside && prevState === 'inside' && fence.alertOnExit) {
+        await prisma.notification.create({
+          data: {
+            userId: fence.ownerUserId,
+            title: `🚪 خرج من النطاق: ${fence.name}`,
+            body: `الجهاز ${deviceId} خرج من نطاق "${fence.name}"`,
+            type: 'geofence_exit'
+          }
+        });
+      }
+    }
+  } catch (err) {
+    console.error('Failed to check geofences in batch:', err);
+  }
 }
 
 export const runtime = 'nodejs';

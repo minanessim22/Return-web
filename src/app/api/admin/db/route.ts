@@ -1,8 +1,22 @@
-import { getAdminUserStats, readStore } from '@/lib/server/store';
-import { getSqliteHealth, getSqliteSummary } from '@/lib/server/sqlite-db';
+import { prisma } from '@/lib/server/db';
+import { getDatabaseHealth, getTableSummary } from '@/lib/server/sqlite-db';
 import { apiJson, requireAdmin } from '@/lib/server/http';
 
 export const runtime = 'nodejs';
+
+async function getAdminUserStats() {
+  const usersCount = await prisma.user.count();
+  const activeUsersCount = await prisma.user.count({ where: { status: 'ACTIVE' } });
+  const suspendedUsersCount = await prisma.user.count({ where: { status: 'SUSPENDED' } });
+  return {
+    users: usersCount,
+    currentUsers: usersCount,
+    activeUsers: activeUsersCount,
+    suspendedUsers: suspendedUsersCount,
+    deletedUsers: 0,
+    totalRows: usersCount
+  };
+}
 
 export async function GET() {
   const admin = await requireAdmin();
@@ -10,13 +24,15 @@ export async function GET() {
     return admin.response;
   }
 
-  const store = await readStore();
+  const userMetrics = await getAdminUserStats();
+  const health = await getDatabaseHealth();
+  const tables = await getTableSummary();
 
   return apiJson({
     engine: 'supabase',
-    file: (await getSqliteHealth()).file,
-    tables: await getSqliteSummary(),
-    userMetrics: getAdminUserStats(store),
-    health: await getSqliteHealth()
+    file: health.file,
+    tables,
+    userMetrics,
+    health
   });
 }

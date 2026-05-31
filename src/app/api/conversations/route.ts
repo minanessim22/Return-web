@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/server/session';
-import { ensureConversationForMatch, getConversationDetailForUser, listConversationSummariesForUser, readStore, updateStore } from '@/lib/server/store';
+import { ensureConversationForMatch, getConversationDetailForUser, listConversationSummariesForUser } from '@/lib/server/conversation-helpers';
 import { ensureSameOrigin } from '@/lib/server/security';
 
 export const runtime = 'nodejs';
@@ -11,8 +11,8 @@ export async function GET() {
     return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
   }
 
-  const store = await readStore();
-  return NextResponse.json({ items: listConversationSummariesForUser(store, user.id) });
+  const items = await listConversationSummariesForUser(user.id);
+  return NextResponse.json({ items });
 }
 
 export async function POST(request: Request) {
@@ -30,16 +30,14 @@ export async function POST(request: Request) {
   }
 
   try {
-    await updateStore((store) => {
-      ensureConversationForMatch(store, { matchId, requesterUserId: user.id });
-    });
-    const store = await readStore();
-    const conversation = ensureConversationForMatch(store, { matchId, requesterUserId: user.id });
-    return NextResponse.json({ item: getConversationDetailForUser(store, conversation.id, user.id) });
+    const conversation = await ensureConversationForMatch(matchId, user.id);
+    const detail = await getConversationDetailForUser(conversation.id, user.id);
+    return NextResponse.json({ item: detail });
   } catch (error) {
     if (error instanceof Error && ['NOT_FOUND', 'FORBIDDEN'].includes(error.message)) {
       return NextResponse.json({ error: error.message }, { status: error.message === 'NOT_FOUND' ? 404 : 403 });
     }
-    throw error;
+    console.error('[Conversations POST] Error:', error);
+    return NextResponse.json({ error: 'An unexpected error occurred.' }, { status: 500 });
   }
 }

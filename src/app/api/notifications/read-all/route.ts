@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/server/session';
 import { ensureSameOrigin } from '@/lib/server/security';
-import { updateStore } from '@/lib/server/store';
+import { prisma } from '@/lib/server/db';
 
 export const runtime = 'nodejs';
 
@@ -14,16 +14,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
   }
 
-  let count = 0;
-  await updateStore((store) => {
-    for (const item of store.notifications) {
-      if (item.userId === user.id && !item.isRead) {
-        item.isRead = true;
-        item.readAt = new Date().toISOString();
-        count += 1;
-      }
+  const result = await prisma.notification.updateMany({
+    where: {
+      userId: user.id,
+      isRead: false
+    },
+    data: {
+      isRead: true,
+      readAt: new Date()
     }
   });
 
-  return NextResponse.json({ success: true, count });
+  return NextResponse.json({ success: true, count: result.count });
 }

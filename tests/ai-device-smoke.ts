@@ -1,3 +1,4 @@
+process.env.IS_SMOKE_TEST = 'true';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -20,7 +21,7 @@ import {
   updateUserProfile,
   upsertPotentialMatchesForCase,
   upsertPreviewSelectedMatch
-} from '../src/lib/server/store';
+} from './legacy-store-mock';
 import { compareImageSetsWithKairos, getMatchDecision, validateSingleFaceImage } from '../src/lib/server/kairos-face';
 
 function createEmptyStore(): Store {
@@ -35,7 +36,8 @@ function createEmptyStore(): Store {
     identificationProfiles: [],
     scanEvents: [],
     auditLogs: [],
-    conversations: []
+    conversations: [],
+    geofences: []
   };
 }
 

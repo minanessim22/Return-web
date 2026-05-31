@@ -13,7 +13,7 @@
 
 import { EventEmitter } from 'node:events';
 import mqtt from 'mqtt';
-import { addDeviceLocation, createNotification, readStore, updateStore } from '@/lib/server/store';
+import { prisma } from '@/lib/server/db';
 
 /* ── Types ── */
 
@@ -97,79 +97,98 @@ function parsePayload(raw: Buffer, topic: string): TrackerLocationPayload | null
 
 async function persistLocation(payload: TrackerLocationPayload): Promise<boolean> {
   try {
-    const store = await readStore();
-    // Match by serial number (device_id from hardware == serialNumber in our DB)
-    const device = store.devices.find(
-      (d) =>
-        d.serialNumber === payload.device_id ||
-        d.id === payload.device_id
-    );
+    // 1. Find device by serialNumber or ID
+    const device = await prisma.device.findFirst({
+      where: {
+        OR: [
+          { serialNumber: payload.device_id },
+          { id: payload.device_id }
+        ]
+      },
+      include: {
+        links: {
+          where: { unlinkedAt: null },
+          include: {
+            profile: true
+          }
+        }
+      }
+    });
+
     if (!device) {
       console.warn(`[MQTT] No device found for device_id="${payload.device_id}". Ignoring.`);
       return false;
     }
 
-    await updateStore((draft) => {
-      const draftDevice = draft.devices.find((d) => d.id === device.id);
-      if (!draftDevice) return;
+    const currentBridge = (device.hardwareBridge as any) || {};
+    const updatedBridge = {
+      ...currentBridge,
+      ready: true,
+      lastSeenAt: new Date().toISOString(),
+      lastEventAt: new Date().toISOString()
+    };
 
-      // Update battery
-      if (payload.battery !== undefined) {
-        draftDevice.batteryLevel = Math.max(0, Math.min(100, Math.round(payload.battery)));
-        if (draftDevice.batteryLevel <= 15) {
-          draftDevice.status = 'LOW_BATTERY';
-        } else if (draftDevice.status === 'LOW_BATTERY' || draftDevice.status === 'DISCONNECTED') {
-          draftDevice.status = 'ACTIVE';
+    let nextStatus = device.status;
+    let nextBatteryLevel = device.batteryLevel;
+
+    if (payload.battery !== undefined) {
+      nextBatteryLevel = Math.max(0, Math.min(100, Math.round(payload.battery)));
+      if (device.status === 'DISCONNECTED') {
+        nextStatus = 'ACTIVE';
+      }
+    } else if (device.status === 'DISCONNECTED' || device.status === 'PAUSED') {
+      nextStatus = 'ACTIVE';
+    }
+
+    await prisma.$transaction(async (tx) => {
+      // Update device
+      await tx.device.update({
+        where: { id: device.id },
+        data: {
+          status: nextStatus as any,
+          batteryLevel: nextBatteryLevel,
+          hardwareBridge: updatedBridge as any,
+          trackingEnabled: true
         }
-      }
+      });
 
-      // Mark as active / connected
-      if (draftDevice.status === 'DISCONNECTED' || draftDevice.status === 'INACTIVE') {
-        draftDevice.status = 'ACTIVE';
-      }
-
-      // Update hardware bridge timestamps
-      if (!draftDevice.hardwareBridge) {
-        draftDevice.hardwareBridge = {
-          ready: true,
-          protocol: 'HTTP',
-          ingressPath: '/api/hardware/devices/telemetry',
-          headerName: 'x-device-token',
-        };
-      }
-      const now = new Date().toISOString();
-      draftDevice.hardwareBridge.lastSeenAt = now;
-      draftDevice.hardwareBridge.lastEventAt = now;
-      draftDevice.trackingEnabled = true;
-      draftDevice.updatedAt = now;
-
-      // Add location record
+      // Add GPS Location record
       if (payload.lat !== null && payload.lon !== null) {
-        addDeviceLocation(draft, draftDevice.id, {
-          latitude: payload.lat,
-          longitude: payload.lon,
-          source: 'mqtt_a9g',
+        await tx.gpsLocation.create({
+          data: {
+            deviceId: device.id,
+            latitude: payload.lat,
+            longitude: payload.lon,
+            recordedAt: payload.timestamp ? new Date(payload.timestamp) : new Date()
+          }
+        });
+
+        await tx.locationHistory.create({
+          data: {
+            deviceId: device.serialNumber,
+            lat: payload.lat,
+            lon: payload.lon,
+            recordedAt: payload.timestamp ? new Date(payload.timestamp) : new Date(),
+            source: 'mqtt_a9g'
+          }
         });
       }
 
-      // Notify the device owner
-      if (draftDevice.linkedProfileId) {
-        const profile = draft.identificationProfiles.find((p) => p.id === draftDevice.linkedProfileId);
-        if (profile) {
-          // التعديل: تغيير الإشعار بناءً على نوع التنبيه
-          const isFall = payload.type === 'fall';
-          createNotification(
-            draft,
-            profile.ownerUserId,
-            isFall ? '🚨 URGENT: Fall Detected!' : 'Live GPS Update',
-            isFall
+      // Check linked profiles and create notification
+      const activeLink = device.links[0];
+      if (activeLink && activeLink.profile) {
+        const profile = activeLink.profile;
+        const isFall = payload.type === 'fall';
+        await tx.notification.create({
+          data: {
+            userId: profile.ownerUserId!,
+            title: isFall ? '🚨 URGENT: Fall Detected!' : 'Live GPS Update',
+            body: isFall
               ? `${profile.displayName} may have fallen! Please check on them immediately.`
               : `${profile.displayName}'s device sent a live GPS update via MQTT.`,
-            isFall ? 'fall_alert' : 'gps_telemetry',
-            undefined,
-            `/devices`
-          );
-        }
+            type: isFall ? 'fall_alert' : 'gps_telemetry'
+          }
+        });
       }
     });
 

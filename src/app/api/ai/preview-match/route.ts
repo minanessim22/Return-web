@@ -1,24 +1,23 @@
+import { prisma } from '@/lib/server/db';
+import { hydrateCase } from '@/lib/server/case-helpers';
+import { scorePotentialMatchAsync } from '@/lib/server/match-scoring';
 import {
-  createId,
-  hydrateCase,
   inferCategory,
-  isCaseEligibleForAutoMatching,
   parseOptionalDate,
   parseOptionalNumber,
-  parseOptionalString,
-  readStore,
-  scorePotentialMatchAsync
-} from '@/lib/server/store';
+  parseOptionalString
+} from '@/lib/server/security';
 import { ACCEPTED_MATCH_THRESHOLD, isKairosConfigured, MANUAL_REVIEW_THRESHOLD, validateSingleFaceImage } from '@/lib/server/kairos-face';
 import { apiError, apiJson, enforceRateLimit, readJsonBody, requireSameOrigin, requireUser } from '@/lib/server/http';
-import type { CaseAiAnalysis, CaseRecord, CaseType } from '@/lib/shared-types';
+import type { CaseAiAnalysis, CaseType } from '@/lib/shared-types';
+import { randomUUID } from 'node:crypto';
 
 export const runtime = 'nodejs';
 
 const MIN_PREVIEW_MATCH_SCORE = ACCEPTED_MATCH_THRESHOLD;
 const MIN_PREVIEW_IMAGE_SCORE = MANUAL_REVIEW_THRESHOLD;
 
-function buildPreviewCase(body: Record<string, unknown>, ownerUserId: string, type: CaseType): CaseRecord {
+function buildPreviewCase(body: Record<string, unknown>, ownerUserId: string, type: CaseType): any {
   const images = Array.isArray(body.images)
     ? body.images.filter((item): item is string => typeof item === 'string' && item.trim().length > 0).slice(0, 4)
     : typeof body.photo === 'string' && body.photo.trim()
@@ -26,7 +25,7 @@ function buildPreviewCase(body: Record<string, unknown>, ownerUserId: string, ty
       : [];
 
   return {
-    id: createId('preview_case'),
+    id: 'preview_case_' + randomUUID().replace(/-/g, '').slice(0, 12),
     referenceCode: 'PREVIEW-AI',
     ownerUserId,
     type,
@@ -47,7 +46,7 @@ function buildPreviewCase(body: Record<string, unknown>, ownerUserId: string, ty
     lastSeenAt: type === 'MISSING' ? parseOptionalDate(body.lastSeenAt ?? body.dateTime) : undefined,
     foundAt: type === 'FOUND' ? parseOptionalDate(body.foundAt ?? body.dateTime) : undefined,
     images: images.map((imageUrl, index) => ({
-      id: createId('img'),
+      id: 'img_' + randomUUID().replace(/-/g, '').slice(0, 12),
       imageUrl,
       sortOrder: index,
       createdAt: new Date().toISOString()
@@ -93,9 +92,9 @@ export async function POST(request: Request) {
   if (isKairosConfigured()) {
     const faceValidation = await validateSingleFaceImage(sourceImage);
     if (
-      !faceValidation.ok
-      && faceValidation.usedOnlineAi
-      && (faceValidation.issue === 'NO_FACE_DETECTED' || faceValidation.issue === 'MULTIPLE_FACES' || faceValidation.issue === 'UNSUPPORTED_IMAGE')
+      !faceValidation.ok &&
+      faceValidation.usedOnlineAi &&
+      (faceValidation.issue === 'NO_FACE_DETECTED' || faceValidation.issue === 'MULTIPLE_FACES' || faceValidation.issue === 'UNSUPPORTED_IMAGE')
     ) {
       return apiError(422, faceValidation.message, {
         decision: 'No Match',
@@ -105,7 +104,38 @@ export async function POST(request: Request) {
     }
   }
 
-  const store = await readStore();
+  // Query eligible active candidates of the opposite type from PostgreSQL via Prisma (equivalent to isCaseEligibleForAutoMatching)
+  const candidates = await prisma.caseItem.findMany({
+    where: {
+      deletedAt: null,
+      status: { in: ['ACTIVE', 'UNDER_REVIEW', 'MATCHED'] },
+      type: caseType === 'MISSING' ? 'FOUND' : 'MISSING',
+      // Exclude candidates with a confirmed match
+      NOT: {
+        OR: [
+          {
+            missingMatches: {
+              some: {
+                status: 'CONFIRMED'
+              }
+            }
+          },
+          {
+            foundMatches: {
+              some: {
+                status: 'CONFIRMED'
+              }
+            }
+          }
+        ]
+      }
+    },
+    include: {
+      images: true,
+      owner: true
+    }
+  });
+
   const matches: Array<{
     score: number;
     reason: string;
@@ -120,10 +150,10 @@ export async function POST(request: Request) {
     matchedCaseId?: string;
     matchedReportId?: string;
     scoreBreakdown?: Record<string, number | undefined>;
-    otherCase: ReturnType<typeof hydrateCase>;
+    otherCase: any;
   }> = [];
 
-  for (const candidate of store.cases.filter((item) => isCaseEligibleForAutoMatching(store, item) && item.type !== previewCase.type)) {
+  for (const candidate of candidates) {
     const [missingCase, foundCase] = previewCase.type === 'MISSING' ? [previewCase, candidate] : [candidate, previewCase];
     const result = await scorePotentialMatchAsync(missingCase, foundCase);
     if (result.score < MANUAL_REVIEW_THRESHOLD) {
@@ -132,6 +162,8 @@ export async function POST(request: Request) {
     if (result.usedOnlineAi && result.imageScore !== undefined && result.imageScore < MANUAL_REVIEW_THRESHOLD) {
       continue;
     }
+
+    const hydrated = await hydrateCase(candidate, false);
 
     matches.push({
       score: result.score,
@@ -147,7 +179,7 @@ export async function POST(request: Request) {
       matchedCaseId: candidate.id,
       matchedReportId: candidate.id,
       scoreBreakdown: result.scoreBreakdown,
-      otherCase: hydrateCase(candidate, store, false)
+      otherCase: hydrated
     });
   }
 
@@ -164,3 +196,4 @@ export async function POST(request: Request) {
     minimumManualReviewScore: MANUAL_REVIEW_THRESHOLD
   });
 }
+

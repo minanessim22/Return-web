@@ -29,7 +29,7 @@
 import { ensureMqttBridge, getMqttEmitter } from '@/lib/server/mqtt-bridge';
 import type { TrackerLocationEvent } from '@/lib/server/mqtt-bridge';
 import { insertLocationHistory, insertLocationHistoryBatch, isTrackerRegistered } from '@/lib/server/sqlite-db';
-import { updateStore } from '@/lib/server/store';
+import { prisma } from '@/lib/server/db';
 
 // ── Geofence helpers ──────────────────────────────────────────────
 
@@ -46,52 +46,50 @@ function haversineMeters(lat1: number, lon1: number, lat2: number, lon2: number)
 /** Check active geofences for the given device and fire notifications on state change */
 async function checkGeofences(deviceId: string, lat: number, lon: number) {
   try {
-    await updateStore((store) => {
-      const fences = store.geofences.filter((g) => g.isActive && g.deviceId === deviceId);
-      for (const fence of fences) {
-        const dist = haversineMeters(lat, lon, fence.lat, fence.lon);
-        const isInside = dist <= fence.radiusMeters;
-        const prevState = fence.lastState ?? 'unknown';
-        const newState = isInside ? 'inside' : 'outside';
-
-        fence.lastState = newState;
-        fence.lastCheckedAt = new Date().toISOString();
-
-        if (prevState === 'unknown') continue; // first reading, no alert
-
-        if (isInside && prevState === 'outside' && fence.alertOnEnter) {
-          // Entered the geofence
-          const owner = store.users.find((u) => u.id === fence.ownerUserId);
-          if (owner) {
-            store.notifications.unshift({
-              id: `notif_${Date.now()}`,
-              userId: fence.ownerUserId,
-              title: `📍 دخل النطاق: ${fence.name}`,
-              body: `الجهاز ${deviceId} دخل نطاق "${fence.name}"`,
-              type: 'geofence_enter',
-              isRead: false,
-              createdAt: new Date().toISOString(),
-            } as any);
-          }
-        } else if (!isInside && prevState === 'inside' && fence.alertOnExit) {
-          // Exited the geofence
-          const owner = store.users.find((u) => u.id === fence.ownerUserId);
-          if (owner) {
-            store.notifications.unshift({
-              id: `notif_${Date.now()}`,
-              userId: fence.ownerUserId,
-              title: `🚪 خرج من النطاق: ${fence.name}`,
-              body: `الجهاز ${deviceId} خرج من نطاق "${fence.name}"`,
-              type: 'geofence_exit',
-              isRead: false,
-              createdAt: new Date().toISOString(),
-            } as any);
-          }
-        }
-      }
+    const fences = await prisma.geofence.findMany({
+      where: { isActive: true, deviceId }
     });
-  } catch {
-    // Non-fatal — geofence check failure shouldn't block GPS reporting
+
+    for (const fence of fences) {
+      const dist = haversineMeters(lat, lon, fence.lat, fence.lon);
+      const isInside = dist <= fence.radiusMeters;
+      const prevState = fence.lastState ?? 'unknown';
+      const newState = isInside ? 'inside' : 'outside';
+
+      await prisma.geofence.update({
+        where: { id: fence.id },
+        data: {
+          lastState: newState,
+          lastCheckedAt: new Date()
+        }
+      });
+
+      if (prevState === 'unknown') continue; // first reading, no alert
+
+      if (isInside && prevState === 'outside' && fence.alertOnEnter) {
+        // Entered the geofence
+        await prisma.notification.create({
+          data: {
+            userId: fence.ownerUserId,
+            title: `📍 دخل النطاق: ${fence.name}`,
+            body: `الجهاز ${deviceId} دخل نطاق "${fence.name}"`,
+            type: 'geofence_enter'
+          }
+        });
+      } else if (!isInside && prevState === 'inside' && fence.alertOnExit) {
+        // Exited the geofence
+        await prisma.notification.create({
+          data: {
+            userId: fence.ownerUserId,
+            title: `🚪 خرج من النطاق: ${fence.name}`,
+            body: `الجهاز ${deviceId} خرج من نطاق "${fence.name}"`,
+            type: 'geofence_exit'
+          }
+        });
+      }
+    }
+  } catch (err) {
+    console.error('Failed to check geofences:', err);
   }
 }
 

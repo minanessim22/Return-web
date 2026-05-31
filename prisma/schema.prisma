@@ -37,6 +37,7 @@ model User {
   notifications            Notification[]
   sessions                 Session[]
   preference               UserPreference?
+  geofences                Geofence[]
 
   @@map("users")
 }
@@ -152,18 +153,20 @@ model CaseStatusHistory {
 }
 
 model CaseMatch {
-  id                String      @id @default(uuid()) @db.Uuid
-  missingCaseId     String      @map("missing_case_id") @db.Uuid
-  foundCaseId       String      @map("found_case_id") @db.Uuid
-  source            String      @default("ai_face_match")
-  score             Float
-  status            MatchStatus @default(PENDING)
-  confirmedByUserId String?     @map("confirmed_by_user_id") @db.Uuid
-  confirmedAt       DateTime?   @map("confirmed_at")
-  createdAt         DateTime    @default(now()) @map("created_at")
-  confirmedByUser   User?       @relation("MatchConfirmedBy", fields: [confirmedByUserId], references: [id])
-  foundCase         CaseItem    @relation("FoundCase", fields: [foundCaseId], references: [id], onDelete: Cascade)
-  missingCase       CaseItem    @relation("MissingCase", fields: [missingCaseId], references: [id], onDelete: Cascade)
+  id                            String      @id @default(uuid()) @db.Uuid
+  missingCaseId                 String      @map("missing_case_id") @db.Uuid
+  foundCaseId                   String      @map("found_case_id") @db.Uuid
+  source                        String      @default("ai_face_match")
+  score                         Float
+  status                        MatchStatus @default(PENDING)
+  confirmationRequestedAt       DateTime?   @map("confirmation_requested_at")
+  confirmationRequestedByUserId String?     @map("confirmation_requested_by_user_id") @db.Uuid
+  confirmedByUserId             String?     @map("confirmed_by_user_id") @db.Uuid
+  confirmedAt                   DateTime?   @map("confirmed_at")
+  createdAt                     DateTime    @default(now()) @map("created_at")
+  confirmedByUser               User?       @relation("MatchConfirmedBy", fields: [confirmedByUserId], references: [id])
+  foundCase                     CaseItem    @relation("FoundCase", fields: [foundCaseId], references: [id], onDelete: Cascade)
+  missingCase                   CaseItem    @relation("MissingCase", fields: [missingCaseId], references: [id], onDelete: Cascade)
 
   @@index([missingCaseId])
   @@index([foundCaseId])
@@ -212,12 +215,17 @@ model Device {
   id                    String        @id @default(uuid()) @db.Uuid
   ownerUserId           String?       @map("owner_user_id") @db.Uuid
   type                  DeviceType
+  hardwareModel         String        @default("STANDALONE") @map("hardware_model")
+  supportsNfc           Boolean       @default(false) @map("supports_nfc")
+  supportsBarcode       Boolean       @default(false) @map("supports_barcode")
+  supportsGps           Boolean       @default(false) @map("supports_gps")
   serialNumber          String        @unique @map("serial_number")
   label                 String?
   status                DeviceStatus  @default(ACTIVE)
   batteryLevel          Int?          @map("battery_level")
   updateIntervalMinutes Int?          @map("update_interval_minutes")
   trackingEnabled       Boolean       @default(false) @map("tracking_enabled")
+  hardwareBridge        Json?         @map("hardware_bridge")
   createdAt             DateTime      @default(now()) @map("created_at")
   updatedAt             DateTime      @updatedAt @map("updated_at")
   links                 DeviceLink[]
@@ -468,4 +476,25 @@ enum MessageType {
   TEXT
   IMAGE
   SYSTEM
+}
+
+model Geofence {
+  id            String    @id @default(uuid()) @db.Uuid
+  ownerUserId   String    @map("owner_user_id") @db.Uuid
+  deviceId      String    @map("device_id")
+  name          String
+  lat           Float
+  lon           Float
+  radiusMeters  Float     @map("radius_meters")
+  alertOnEnter  Boolean   @default(true) @map("alert_on_enter")
+  alertOnExit   Boolean   @default(true) @map("alert_on_exit")
+  isActive      Boolean   @default(true) @map("is_active")
+  lastState     String?   @map("last_state") // "inside" | "outside" | "unknown"
+  lastCheckedAt DateTime? @map("last_checked_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  owner         User      @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+
+  @@map("geofences")
 }

@@ -1,17 +1,15 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/server/session';
+import { prisma } from '@/lib/server/db';
 import {
-  createCaseRecord,
-  hydrateCase,
-  inferCategory,
   parseOptionalDate,
   parseOptionalNumber,
   parseOptionalString,
-  readStore,
-  updateStore,
-  upsertPotentialMatchesForCaseAsync
-} from '@/lib/server/store';
-import { ensureSameOrigin } from '@/lib/server/security';
+  inferCategory,
+  ensureSameOrigin
+} from '@/lib/server/security';
+import { hydrateCase } from '@/lib/server/case-helpers';
+import { upsertPotentialMatchesForCase } from '@/lib/server/match-helpers';
 
 export const runtime = 'nodejs';
 
@@ -19,6 +17,17 @@ function isValidCoordinate(latitude?: number, longitude?: number) {
   if (latitude === undefined && longitude === undefined) return true;
   if (latitude === undefined || longitude === undefined) return false;
   return latitude >= -90 && latitude <= 90 && longitude >= -180 && longitude <= 180;
+}
+
+async function nextReferenceCode() {
+  const cases = await prisma.caseItem.findMany({
+    select: { referenceCode: true }
+  });
+  const codes = cases
+    .map((item) => Number(String(item.referenceCode).replace(/[^0-9]/g, '')))
+    .filter((value) => Number.isFinite(value));
+  const next = Math.max(2000, ...codes) + 1;
+  return `RTN-${next}`;
 }
 
 export async function POST(request: Request) {
@@ -35,11 +44,13 @@ export async function POST(request: Request) {
   const fullName = parseOptionalString(body.fullName ?? body.name);
   const age = parseOptionalNumber(body.age);
   const locationText = parseOptionalString(body.locationText ?? body.location);
-  const eventTime = parseOptionalDate(body.lastSeenAt ?? body.dateTime);
+  const eventTimeStr = parseOptionalDate(body.lastSeenAt ?? body.dateTime);
+  const eventTime = eventTimeStr ? new Date(eventTimeStr) : undefined;
   const description = parseOptionalString(body.description);
   const clothesColor = parseOptionalString(body.clothesColor);
   const latitude = parseOptionalNumber(body.latitude);
   const longitude = parseOptionalNumber(body.longitude);
+
   if (!fullName) {
     return NextResponse.json({ error: 'Please enter the missing person or item name.' }, { status: 400 });
   }
@@ -65,15 +76,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Please enter a valid map location.' }, { status: 400 });
   }
 
-  let createdId = '';
-  await updateStore(async (store) => {
-    const images = Array.isArray(body.images)
-      ? body.images.filter((item: unknown): item is string => typeof item === 'string' && item.trim().length > 0).slice(0, 4)
-      : parseOptionalString(body.photo)
-        ? [String(body.photo)]
-        : [];
+  const imageList = Array.isArray(body.images)
+    ? body.images.filter((item: unknown): item is string => typeof item === 'string' && item.trim().length > 0).slice(0, 4)
+    : parseOptionalString(body.photo)
+      ? [String(body.photo)]
+      : [];
 
-    const created = createCaseRecord(store, {
+  const refCode = await nextReferenceCode();
+
+  const createdCase = await prisma.caseItem.create({
+    data: {
       ownerUserId: user.id,
       type: 'MISSING',
       status: 'ACTIVE',
@@ -89,19 +101,49 @@ export async function POST(request: Request) {
       longitude,
       eventTime,
       lastSeenAt: eventTime,
-      images,
-      aiAnalysis: typeof body.aiAnalysis === 'object' && body.aiAnalysis ? body.aiAnalysis : undefined,
-      skipAutoMatch: true
-    });
-    createdId = created.id;
-    await upsertPotentialMatchesForCaseAsync(store, created);
+      referenceCode: refCode,
+      images: {
+        create: imageList.map((url: string, idx: number) => ({
+          imageUrl: url,
+          sortOrder: idx
+        }))
+      },
+      statusHistory: {
+        create: {
+          status: 'ACTIVE',
+          changedByUserId: user.id,
+          note: 'Case created'
+        }
+      }
+    },
+    include: {
+      owner: true,
+      images: true
+    }
   });
 
-  const store = await readStore();
-  const created = store.cases.find((item) => item.id === createdId);
-  if (!created) {
-    return NextResponse.json({ error: 'Unable to create the case.' }, { status: 500 });
-  }
+  await prisma.notification.create({
+    data: {
+      userId: user.id,
+      title: 'Report saved',
+      body: `${fullName} was saved as ${refCode}.`,
+      type: 'case_created',
+      relatedCaseId: createdCase.id
+    }
+  });
 
-  return NextResponse.json({ item: hydrateCase(created, store, true) }, { status: 201 });
+  // Run match heuristic
+  await upsertPotentialMatchesForCase({
+    id: createdCase.id,
+    type: createdCase.type,
+    category: createdCase.category,
+    gender: createdCase.gender,
+    age: createdCase.age,
+    fullName: createdCase.fullName,
+    estimatedName: createdCase.estimatedName
+  });
+
+  const hydrated = await hydrateCase(createdCase, true);
+
+  return NextResponse.json({ item: hydrated }, { status: 201 });
 }

@@ -2,8 +2,9 @@ import { NextResponse } from 'next/server';
 import { checkRateLimit } from '@/lib/server/rate-limit';
 import { buildPasswordResetEmail, sendMail } from '@/lib/server/email';
 import { apiError, readJsonBody, requireSameOrigin } from '@/lib/server/http';
-import { getClientIp, getUserAgent, hashValue, normalizeEmail } from '@/lib/server/security';
-import { createVerificationRequest, readStore, recordAuditLog, updateStore } from '@/lib/server/store';
+import { getClientIp, normalizeEmail } from '@/lib/server/security';
+import { createVerificationRequest } from '@/lib/server/verification';
+import { prisma } from '@/lib/server/db';
 
 export const runtime = 'nodejs';
 
@@ -14,7 +15,6 @@ export async function POST(request: Request) {
   const body = await readJsonBody(request);
   const email = normalizeEmail(String(body.email || ''));
   const ip = getClientIp(request) || 'unknown';
-  const userAgent = getUserAgent(request);
 
   const rate = checkRateLimit(`password-code:${ip}:${email}`, 5, 10 * 60 * 1000);
   if (!rate.allowed) {
@@ -24,9 +24,18 @@ export async function POST(request: Request) {
   }
   if (!email) return apiError(400, 'Please enter your email address.');
 
-  const store = await readStore();
-  const user = store.users.find((entry) => entry.email === email && entry.status !== 'DELETED');
+  // Find user directly in Supabase
+  const user = await prisma.user.findFirst({
+    where: {
+      email: {
+        equals: email,
+        mode: 'insensitive'
+      }
+    }
+  });
+
   if (!user) {
+    // Return fake success for email enumeration mitigation
     return NextResponse.json({
       success: true,
       delivery: 'email',
@@ -36,24 +45,13 @@ export async function POST(request: Request) {
     });
   }
 
-  let code = '';
-  await updateStore((draft) => {
-    const created = createVerificationRequest(draft, {
-      purpose: 'RESET_PASSWORD',
-      email,
-      userId: user.id,
-      payload: { userId: user.id },
-      expiresInMinutes: 10
-    });
-    code = created.code;
-    recordAuditLog(draft, {
-      event: 'auth_password_reset_requested',
-      severity: 'info',
-      userId: user.id,
-      ipHash: hashValue(ip),
-      userAgent,
-      details: { email }
-    });
+  // Create verification request in DB
+  const { code } = await createVerificationRequest({
+    purpose: 'RESET_PASSWORD',
+    email,
+    userId: user.id,
+    payload: { userId: user.id },
+    expiresInMinutes: 10
   });
 
   const mail = buildPasswordResetEmail(code, user.name || user.username || 'there');

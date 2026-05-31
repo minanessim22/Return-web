@@ -112,3 +112,45 @@ export function publicBaseUrl(request?: Request) {
   }
   return 'http://localhost:3000';
 }
+
+const MAX_PLAIN_TEXT_LENGTH = 500;
+const MAX_INLINE_IMAGE_LENGTH = 12_000_000;
+
+function isInlineImageValue(value: string) {
+  return /^data:image\/[a-z0-9.+-]+(?:;[a-z0-9=:+-]+)*,/i.test(value);
+}
+
+export function parseOptionalString(value: unknown) {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+  const sanitized = sanitizePlainText(value).trim();
+  if (!sanitized.length) {
+    return undefined;
+  }
+  const maxLength = isInlineImageValue(sanitized) ? MAX_INLINE_IMAGE_LENGTH : MAX_PLAIN_TEXT_LENGTH;
+  return sanitized.slice(0, maxLength);
+}
+
+export function parseOptionalNumber(value: unknown) {
+  if (value === null || value === undefined || value === '') {
+    return undefined;
+  }
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+export function parseOptionalDate(value: unknown) {
+  return dateToIso(value);
+}
+
+export function inferCategory(value?: string) {
+  const normalized = value?.trim().toLowerCase();
+  if (!normalized) {
+    return 'child';
+  }
+  if (['child', 'elderly', 'pet', 'document', 'bag', 'vehicle', 'adult male', 'adult female', 'car', 'motorcycle', 'bicycle'].includes(normalized)) {
+    return normalized;
+  }
+  return normalized;
+}

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createNotification, getProfileByToken, readStore, recordProfileScan, updateStore } from '@/lib/server/store';
+import { prisma } from '@/lib/server/db';
 
 export const runtime = 'nodejs';
 
@@ -19,31 +19,65 @@ export async function POST(request: Request) {
   }
 
   const token = normalizeToken(raw);
-  const store = await readStore();
-  const item = getProfileByToken(store, token);
-  if (!item) {
+  const profile = await prisma.identificationProfile.findFirst({
+    where: { qrPublicToken: token, isActive: true },
+    include: {
+      emergencyContacts: true
+    }
+  });
+
+  if (!profile) {
     return NextResponse.json({ error: 'No profile matches this QR token.' }, { status: 404 });
   }
 
-  await updateStore((draft) => {
-    recordProfileScan(draft, {
-      profileId: item.id,
-      type: 'QR',
-      rawValue: raw,
-      finderName: typeof body.finderName === 'string' ? body.finderName : undefined,
-      finderPhone: typeof body.finderPhone === 'string' ? body.finderPhone : undefined,
+  // Create scan event
+  await prisma.scanEvent.create({
+    data: {
+      profileId: profile.id,
+      scanType: 'QR',
+      scanToken: raw,
       latitude: typeof body.latitude === 'number' ? body.latitude : undefined,
       longitude: typeof body.longitude === 'number' ? body.longitude : undefined,
-      locationText: typeof body.locationText === 'string' ? body.locationText : undefined
-    });
-    createNotification(
-      draft,
-      item.ownerUserId,
-      'QR profile scanned',
-      `${item.displayName}'s profile was scanned from the found dashboard.`,
-      'qr_scan'
-    );
+      metadata: {
+        finderName: typeof body.finderName === 'string' ? body.finderName : undefined,
+        finderPhone: typeof body.finderPhone === 'string' ? body.finderPhone : undefined,
+        locationText: typeof body.locationText === 'string' ? body.locationText : undefined
+      }
+    }
   });
 
-  return NextResponse.json({ item });
+  if (profile.ownerUserId) {
+    await prisma.notification.create({
+      data: {
+        userId: profile.ownerUserId,
+        title: 'QR profile scanned',
+        body: `${profile.displayName}'s profile was scanned from the found dashboard.`,
+        type: 'qr_scan'
+      }
+    });
+  }
+
+  // Format to match expected public profile item structure
+  const formatted = {
+    id: profile.id,
+    displayName: profile.displayName,
+    age: profile.age,
+    category: profile.category,
+    clothesColor: profile.clothesColor,
+    bloodType: profile.bloodType,
+    medicalNotes: profile.medicalNotes,
+    lastLocationText: profile.lastLocationText,
+    latitude: profile.latitude,
+    longitude: profile.longitude,
+    photoUrl: profile.photoUrl,
+    qrPublicToken: profile.qrPublicToken,
+    isActive: profile.isActive,
+    emergencyContacts: profile.emergencyContacts.map(c => ({
+      contactName: c.contactName,
+      relation: c.relation,
+      phone: c.phone
+    }))
+  };
+
+  return NextResponse.json({ item: formatted });
 }

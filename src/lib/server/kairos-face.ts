@@ -192,6 +192,23 @@ async function runLocalFaceAnalysis(images: string[]) {
 }
 
 async function analyzeImages(images: string[]) {
+  if (process.env.RETURN_FACE_AI_MOCK === '1') {
+    return images.map((item) => {
+      const value = String(item || '').trim();
+      if (value.includes('NOFACE')) {
+        return { ok: false as const, issue: 'NO_FACE_DETECTED' as const, message: 'No face detected.' };
+      } else if (value.includes('MULTIFACE')) {
+        return { ok: false as const, issue: 'MULTIPLE_FACES' as const, message: 'Multiple faces detected. Please use a photo with exactly one face.', faceCount: 2 };
+      } else if (value.includes('CAR')) {
+        return { ok: false as const, issue: 'NO_FACE_DETECTED' as const, message: 'No face detected.' };
+      } else {
+        const base = value.includes('FACE_A') ? 0.9 : value.includes('FACE_B') ? 0.7 : 0.5;
+        const descriptor = Array.from({ length: 128 }, (_, i) => Number((base + ((i % 7) * 0.001)).toFixed(6)));
+        return { ok: true as const, faceCount: 1 as const, confidence: 0.92, quality: 0.88, descriptor };
+      }
+    });
+  }
+
   const results: LocalFaceAnalysis[] = new Array(images.length);
   const uncached: string[] = [];
   const uncachedIndexes: number[] = [];

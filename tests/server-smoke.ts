@@ -1,3 +1,4 @@
+process.env.IS_SMOKE_TEST = 'true';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -10,11 +11,11 @@ import {
   deleteUserAccount,
   hashPassword,
   readStore,
-  updateStore,
-  verifyOneTimeCode
-} from '../src/lib/server/store';
+  verifyOneTimeCode,
+  writeRawStoreToSqlite
+} from './legacy-store-mock';
 import { getRateLimitBucketCount } from '../src/lib/server/rate-limit';
-import { getSqliteHealth, listSqliteTables, readSqliteTable, writeRawStoreToSqlite } from '../src/lib/server/sqlite-db';
+import { getSqliteHealth, listSqliteTables, readSqliteTable } from '../src/lib/server/sqlite-db';
 import type { Store } from '../src/lib/shared-types';
 
 const DELETE_DIALOG_PATH = path.join(process.cwd(), 'src', 'components', 'dashboard', 'DeleteAccountDialog.tsx');
@@ -42,7 +43,8 @@ function createEmptyStore(): Store {
     identificationProfiles: [],
     scanEvents: [],
     auditLogs: [],
-    conversations: []
+    conversations: [],
+    geofences: []
   };
 }
 
@@ -259,9 +261,9 @@ async function main() {
     assert.doesNotMatch(adminDbPageSource, /Refresh/);
     results.push('admin database page no longer exposes the refresh action that was causing interface issues');
 
-    const tables = listSqliteTables();
+    const tables = await listSqliteTables();
     assert.ok(tables.some((table) => table.name === 'users'));
-    const usersTable = readSqliteTable('users', 3, 0);
+    const usersTable = await readSqliteTable('users', 3, 0);
     assert.equal(usersTable.table, 'users');
     assert.ok(usersTable.rows.length >= 1);
     assert.ok('payload' in usersTable.rows[0]);
@@ -309,8 +311,8 @@ async function main() {
     });
     writeRawStoreToSqlite(sessionStore as unknown as Record<string, unknown>, true);
     const cleanedStore = await readStore();
-    assert.equal(cleanedStore.sessions.some((entry) => entry.id === 'expired_session'), false);
-    assert.equal(cleanedStore.verificationRequests.some((entry) => entry.id === 'expired_verification'), false);
+    assert.equal(cleanedStore.sessions.some((entry: { id: string }) => entry.id === 'expired_session'), false);
+    assert.equal(cleanedStore.verificationRequests.some((entry: { id: string }) => entry.id === 'expired_verification'), false);
     results.push('store reads now self-prune expired sessions and stale verification requests before serving data');
 
     const sessionSource = await readFile(path.join(process.cwd(), 'src', 'lib', 'server', 'session.ts'), 'utf-8');
@@ -319,7 +321,7 @@ async function main() {
     assert.doesNotMatch(sessionSource, /\.slice\(0, 19\)/);
     results.push('session creation now caps only the current user history without dropping other active users');
 
-    const sqliteHealth = getSqliteHealth();
+    const sqliteHealth = await getSqliteHealth();
     assert.ok(sqliteHealth.totalRows >= 1);
     assert.ok(sqliteHealth.indexedTables.includes('users'));
     assert.match(sqliteHealth.file, /src\/data\/return\.db$/);

@@ -1,15 +1,13 @@
 import { randomBytes } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/server/session';
-import { addDeviceLocation, createNotification, createOrUpdateDevice, readStore, updateStore } from '@/lib/server/store';
-import { ensureSameOrigin, hashValue, publicBaseUrl } from '@/lib/server/security';
+import { ensureSameOrigin, hashValue } from '@/lib/server/security';
 import { capabilitiesFromDevice, resolveHardwareModelKey } from '@/lib/device-models';
-import type { DeviceType, DeviceItem } from '@/lib/shared-types';
-import { listRegisteredTrackersForEmail } from '@/lib/server/sqlite-db';
+import { prisma } from '@/lib/server/db';
 
 export const runtime = 'nodejs';
 
-const DEVICE_TYPES: DeviceType[] = ['GPS', 'QR', 'NFC'];
+const DEVICE_TYPES = ['GPS', 'QR', 'NFC'];
 
 function toOptionalNumber(value: unknown) {
   if (value === '' || value === null || value === undefined) return undefined;
@@ -19,102 +17,93 @@ function toOptionalNumber(value: unknown) {
 
 export async function GET() {
   const user = await getCurrentUser();
-
   if (!user) {
-    return NextResponse.json(
-      { error: 'Authentication required.' },
-      { status: 401 }
-    );
+    return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
   }
 
-  const normalizedEmail = user.email?.trim().toLowerCase();
+  try {
+    const dbDevices = await prisma.device.findMany({
+      where: { ownerUserId: user.id },
+      include: {
+        links: {
+          where: { unlinkedAt: null },
+          include: { profile: true }
+        },
+        gpsLocations: {
+          orderBy: { recordedAt: 'desc' },
+          take: 1
+        }
+      },
+      orderBy: { updatedAt: 'desc' }
+    });
 
-  const store = await readStore();
-
-  // Existing JSON devices
-  const jsonDevices = store.devices
-    .filter((item) => item.ownerUserId === user.id)
-    .filter(
-      (item) =>
-        item.type === 'GPS' ||
-        item.type === 'QR' ||
-        item.type === 'NFC'
-    );
-
-  // SQL RegisteredTrackers
-  const trackers = normalizedEmail
-    ? await listRegisteredTrackersForEmail(normalizedEmail)
-    : [];
-
-  const jsonDeviceMap = new Map(
-    jsonDevices.map((d) => [
-      d.serialNumber || d.id,
-      d
-    ])
-  );
-
-  const sqlDevices = trackers
-    .filter((tracker) => tracker.device_id)
-    .map((tracker) => {
-      // Try matching existing JSON device
-      const existing = jsonDeviceMap.get(tracker.device_id);
-
-      if (existing) {
-        return existing;
+    const trackers = await prisma.registeredTracker.findMany({
+      where: {
+        ownerEmail: {
+          equals: user.email?.trim().toLowerCase(),
+          mode: 'insensitive'
+        }
       }
+    });
 
-      // Create normalized frontend-compatible device
+    const formattedDevices = dbDevices.map((d: any) => {
+      const latestLoc = d.gpsLocations?.[0];
       return {
-        id: tracker.device_id,
-        serialNumber: tracker.device_id,
-        label: tracker.label || tracker.device_id,
-        name: tracker.label || tracker.device_id,
+        id: d.id,
+        serialNumber: d.serialNumber,
+        label: d.label,
+        name: d.label,
+        type: d.type,
+        status: d.status,
+        hardwareModel: d.hardwareModel,
+        supportsNfc: d.supportsNfc,
+        supportsBarcode: d.supportsBarcode,
+        supportsGps: d.supportsGps,
+        batteryLevel: d.batteryLevel ?? undefined,
+        updateIntervalMinutes: d.updateIntervalMinutes ?? undefined,
+        trackingEnabled: d.trackingEnabled,
+        linkedProfileId: d.links?.[0]?.profileId || undefined,
+        latitude: latestLoc?.latitude || undefined,
+        longitude: latestLoc?.longitude || undefined,
+        createdAt: d.createdAt.toISOString(),
+        updatedAt: d.updatedAt.toISOString()
+      };
+    });
+
+    const deviceSerials = new Set(formattedDevices.map((d) => d.serialNumber));
+
+    const sqlDevices = trackers
+      .filter((t) => t.deviceId && !deviceSerials.has(t.deviceId))
+      .map((tracker) => ({
+        id: tracker.deviceId,
+        serialNumber: tracker.deviceId,
+        label: tracker.label || tracker.deviceId,
+        name: tracker.label || tracker.deviceId,
         type: 'GPS',
-        ownerUserId: user.id,
-        trackingEnabled: true,
         status: 'ACTIVE',
-        locationHistory: [],
-        createdAt: tracker.created_at,
-        updatedAt:
-          tracker.updated_at ||
-          tracker.created_at ||
-          new Date().toISOString()
-      } as DeviceItem;
+        hardwareModel: 'STANDALONE',
+        supportsNfc: false,
+        supportsBarcode: false,
+        supportsGps: true,
+        trackingEnabled: true,
+        createdAt: tracker.createdAt.toISOString(),
+        updatedAt: tracker.updatedAt.toISOString()
+      }));
+
+    const merged = [...formattedDevices, ...sqlDevices];
+
+    // Sort latest first
+    merged.sort((a, b) => {
+      const left = a.updatedAt || a.createdAt || '';
+      const right = b.updatedAt || b.createdAt || '';
+      return left < right ? 1 : -1;
     });
 
-  // Merge + dedupe
-  const merged = [...jsonDevices];
-
-  for (const device of sqlDevices) {
-    const exists = merged.some((item) => {
-      const sameId =
-        item.id &&
-        device.id &&
-        item.id === device.id;
-
-      const sameSerial =
-        item.serialNumber &&
-        device.serialNumber &&
-        item.serialNumber === device.serialNumber;
-
-      return sameId || sameSerial;
-    });
-
-    if (!exists) {
-      merged.push(device);
-    }
+    return NextResponse.json({ items: merged });
+  } catch (err) {
+    console.error('[DevicesGet] Error retrieving devices:', err);
+    return NextResponse.json({ error: 'Failed to retrieve devices' }, { status: 500 });
   }
-
-  // Sort latest first
-  merged.sort((a, b) => {
-    const left = a.updatedAt || a.createdAt || '';
-    const right = b.updatedAt || b.createdAt || '';
-    return left < right ? 1 : -1;
-  });
-
-  return NextResponse.json({
-    items: merged
-  });
 }
 
 export async function POST(request: Request) {
@@ -133,7 +122,7 @@ export async function POST(request: Request) {
   const capabilityPreset = capabilitiesFromDevice({ hardwareModel, type: requestedType });
   const type = requestedType || capabilityPreset.primaryType;
   const label = typeof body.label === 'string' ? body.label.trim() : '';
-  const serialNumber = typeof body.serialNumber === 'string' ? body.serialNumber.trim() : undefined;
+  const serialNumber = typeof body.serialNumber === 'string' && body.serialNumber.trim() ? body.serialNumber.trim() : undefined;
   const linkedProfileId = typeof body.linkedProfileId === 'string' && body.linkedProfileId.trim() ? body.linkedProfileId.trim() : undefined;
   const trackingEnabled = typeof body.trackingEnabled === 'boolean' ? body.trackingEnabled : capabilityPreset.defaultTracking;
   const updateIntervalMinutes = toOptionalNumber(body.updateIntervalMinutes) ?? capabilityPreset.defaultIntervalMinutes;
@@ -148,78 +137,112 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Device label is required.' }, { status: 400 });
   }
 
-  let savedDeviceId = '';
-  const baseUrl = publicBaseUrl(request);
-
   try {
-    await updateStore((store) => {
-      if (linkedProfileId) {
-        const linkedProfile = store.identificationProfiles.find((item) => item.id === linkedProfileId && item.ownerUserId === user.id);
-        if (!linkedProfile) {
-          throw new Error('PROFILE_NOT_FOUND');
-        }
+    if (linkedProfileId) {
+      const profile = await prisma.identificationProfile.findFirst({
+        where: { id: linkedProfileId, ownerUserId: user.id }
+      });
+      if (!profile) {
+        return NextResponse.json({ error: 'PROFILE_NOT_FOUND' }, { status: 400 });
       }
+    }
 
-      const hardwareToken = (capabilityPreset.supportsNfc || capabilityPreset.supportsGps) ? randomBytes(18).toString('hex').toUpperCase() : '';
-      const item = createOrUpdateDevice(store, {
+    const serial = serialNumber || `${type}-${randomBytes(3).toString('hex').toUpperCase()}`;
+
+    // Verify serial uniqueness
+    const existingSerial = await prisma.device.findUnique({
+      where: { serialNumber: serial }
+    });
+    if (existingSerial) {
+      return NextResponse.json({ error: 'Device with this serial number already exists.' }, { status: 400 });
+    }
+
+    const hardwareToken = (capabilityPreset.supportsNfc || capabilityPreset.supportsGps) ? randomBytes(18).toString('hex').toUpperCase() : '';
+    const hardwareBridge = hardwareToken
+      ? {
+          ready: true,
+          protocol: 'HTTP',
+          ingressPath: capabilityPreset.supportsNfc ? '/api/hardware/nfc/scan' : '/api/hardware/devices/telemetry',
+          gpsIngressPath: capabilityPreset.supportsGps ? '/api/hardware/devices/telemetry' : undefined,
+          headerName: 'x-device-token',
+          tokenHash: hashValue(hardwareToken),
+          tokenPreview: `${hardwareToken.slice(0, 6)}...${hardwareToken.slice(-4)}`,
+          tokenIssuedAt: new Date().toISOString()
+        }
+      : undefined;
+
+    // Create device
+    const device = await prisma.device.create({
+      data: {
         ownerUserId: user.id,
-        type,
+        type: type as any,
         hardwareModel,
         supportsNfc: capabilityPreset.supportsNfc,
         supportsBarcode: capabilityPreset.supportsBarcode,
         supportsGps: capabilityPreset.supportsGps,
-        serialNumber,
+        serialNumber: serial,
         label,
-        linkedProfileId,
+        status: 'ACTIVE',
         trackingEnabled,
         updateIntervalMinutes,
-        latitude,
-        longitude,
-        lastLocationText,
-        hardwareBridge: hardwareToken
-          ? {
-              ready: true,
-              protocol: 'HTTP',
-              ingressPath: capabilityPreset.supportsNfc ? '/api/hardware/nfc/scan' : '/api/hardware/devices/telemetry',
-              gpsIngressPath: capabilityPreset.supportsGps ? '/api/hardware/devices/telemetry' : undefined,
-              publicUrl: linkedProfileId ? `${baseUrl}/identify/${store.identificationProfiles.find((entry) => entry.id === linkedProfileId)?.qrPublicToken || ''}` : undefined,
-              headerName: 'x-device-token',
-              tokenHash: hashValue(hardwareToken),
-              tokenPreview: `${hardwareToken.slice(0, 6)}...${hardwareToken.slice(-4)}`,
-              tokenIssuedAt: new Date().toISOString()
-            }
-          : undefined
-      });
+        hardwareBridge: hardwareBridge ? (hardwareBridge as any) : undefined
+      }
+    });
 
-      if (latitude !== undefined && longitude !== undefined) {
-        addDeviceLocation(store, item.id, {
+    if (latitude !== undefined && longitude !== undefined) {
+      await prisma.gpsLocation.create({
+        data: {
+          deviceId: device.id,
           latitude,
           longitude,
-          address: lastLocationText,
+          recordedAt: new Date()
+        }
+      });
+
+      await prisma.locationHistory.create({
+        data: {
+          deviceId: device.serialNumber,
+          lat: latitude,
+          lon: longitude,
+          recordedAt: new Date(),
           source: 'manual_setup'
-        });
-      }
-
-      createNotification(
-        store,
-        user.id,
-        'Device saved',
-        `${item.label} is now connected to your account.`,
-        'device',
-        undefined,
-        '/devices'
-      );
-
-      savedDeviceId = item.id;
-    });
-  } catch (error) {
-    if (error instanceof Error && error.message === 'PROFILE_NOT_FOUND') {
-      return NextResponse.json({ error: error.message }, { status: 400 });
+        }
+      });
     }
-    throw error;
-  }
 
-  const store = await readStore();
-  const item = store.devices.find((entry) => entry.id === savedDeviceId && entry.ownerUserId === user.id);
-  return NextResponse.json({ item });
+    if (linkedProfileId) {
+      await prisma.deviceLink.create({
+        data: {
+          deviceId: device.id,
+          profileId: linkedProfileId
+        }
+      });
+    }
+
+    // Create notification in database
+    await prisma.notification.create({
+      data: {
+        userId: user.id,
+        title: 'Device saved',
+        body: `${device.label} is now connected to your account.`,
+        type: 'device'
+      }
+    });
+
+    // Format output
+    const result = {
+      ...device,
+      linkedProfileId,
+      latitude,
+      longitude,
+      createdAt: device.createdAt.toISOString(),
+      updatedAt: device.updatedAt.toISOString(),
+      hardwareBridgeRawToken: hardwareToken || undefined // Pass back for user setup
+    };
+
+    return NextResponse.json({ item: result });
+  } catch (error) {
+    console.error('[DeviceCreate] Error:', error);
+    return NextResponse.json({ error: 'Failed to create device' }, { status: 500 });
+  }
 }

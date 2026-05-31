@@ -21,32 +21,23 @@ async function migrate() {
     const rawData = readFileSync(jsonPath, 'utf-8');
     const parsed = JSON.parse(rawData);
 
-    // Save legacy store copy in key_value_store
+    // حفظ النسخة الاحتياطية
     await prisma.keyValueStore.upsert({
-      where: {
-        key: 'MAIN_APP_STORE_V1',
-      },
-      update: {
-        value: rawData,
-      },
-      create: {
-        key: 'MAIN_APP_STORE_V1',
-        value: rawData,
-      },
+      where: { key: 'MAIN_APP_STORE_V1' },
+      update: { value: rawData },
+      create: { key: 'MAIN_APP_STORE_V1', value: rawData },
     });
 
     console.log('Legacy store migrated.');
 
-    // Migrate users to users table
+    // نقل المستخدمين
     const users = parsed.users || [];
     console.log(`Found ${users.length} users`);
 
     for (const user of users) {
       try {
         await prisma.user.upsert({
-          where: {
-            username: user.username,
-          },
+          where: { username: user.username },
           update: {},
           create: {
             username: user.username,

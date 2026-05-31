@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/server/session';
-import { buildDashboardSummary, readStore } from '@/lib/server/store';
+import { buildDashboardSummary } from '@/lib/server/dashboard-helpers';
 
 export const runtime = 'nodejs';
 
@@ -10,6 +10,6 @@ export async function GET() {
     return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
   }
 
-  const store = await readStore();
-  return NextResponse.json(buildDashboardSummary(store, user.id));
+  const summary = await buildDashboardSummary(user.id);
+  return NextResponse.json(summary);
 }

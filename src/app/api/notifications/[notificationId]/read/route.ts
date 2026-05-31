@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/server/session';
 import { ensureSameOrigin } from '@/lib/server/security';
-import { readStore, updateStore } from '@/lib/server/store';
+import { prisma } from '@/lib/server/db';
 
 export const runtime = 'nodejs';
 
@@ -15,18 +15,22 @@ export async function POST(request: Request, context: { params: Promise<{ notifi
   }
 
   const { notificationId } = await context.params;
-  await updateStore((store) => {
-    const item = store.notifications.find((entry) => entry.id === notificationId && entry.userId === user.id);
-    if (item) {
-      item.isRead = true;
-      item.readAt = new Date().toISOString();
-    }
+
+  const item = await prisma.notification.findFirst({
+    where: { id: notificationId, userId: user.id }
   });
 
-  const store = await readStore();
-  const item = store.notifications.find((entry) => entry.id === notificationId && entry.userId === user.id);
   if (!item) {
     return NextResponse.json({ error: 'Notification not found.' }, { status: 404 });
   }
-  return NextResponse.json({ item });
+
+  const updatedItem = await prisma.notification.update({
+    where: { id: notificationId },
+    data: {
+      isRead: true,
+      readAt: new Date()
+    }
+  });
+
+  return NextResponse.json({ item: updatedItem });
 }

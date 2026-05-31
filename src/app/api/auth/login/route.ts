@@ -1,9 +1,9 @@
 import { prisma } from '@/lib/server/db';
 import { applySessionCookie, createSession } from '@/lib/server/session';
-import { getClientIp, getUserAgent } from '@/lib/server/security';
+import { getClientIp, hashValue } from '@/lib/server/security';
 import { apiError, apiJson, readJsonBody, requireSameOrigin } from '@/lib/server/http';
 import { checkRateLimit } from '@/lib/server/rate-limit';
-import { verifyPassword, sanitizeUser } from '@/lib/server/store';
+import { verifyPassword, sanitizeUser, passwordNeedsMigration, hashPassword } from '@/lib/server/auth-helpers';
 
 export const runtime = 'nodejs';
 
@@ -12,7 +12,6 @@ const LOCK_WINDOW_MS = 15 * 60 * 1000;
 
 export async function POST(request: Request) {
   const sameOriginError = requireSameOrigin(request);
-
   if (sameOriginError) {
     return sameOriginError;
   }
@@ -27,12 +26,8 @@ export async function POST(request: Request) {
   ).trim();
 
   const password = String(body.password || '');
-
   const rememberMe = body.rememberMe !== false;
-
   const ip = getClientIp(request) || 'unknown';
-
-  const userAgent = getUserAgent(request);
 
   const rate = checkRateLimit(
     `login:${ip}:${identifier.toLowerCase()}`,
@@ -41,35 +36,19 @@ export async function POST(request: Request) {
   );
 
   if (!rate.allowed) {
-    return apiError(
-      429,
-      'Too many login attempts.'
-    );
+    return apiError(429, 'Too many login attempts.');
   }
 
   if (!identifier || !password) {
-    return apiError(
-      400,
-      'Email or username and password are required.'
-    );
+    return apiError(400, 'Email or username and password are required.');
   }
 
-  // ✅ البحث في Supabase مباشرة
+  // Look up user by email or username
   const user = await prisma.user.findFirst({
     where: {
       OR: [
-        {
-          email: {
-            equals: identifier,
-            mode: 'insensitive'
-          }
-        },
-        {
-          username: {
-            equals: identifier,
-            mode: 'insensitive'
-          }
-        }
+        { email: { equals: identifier, mode: 'insensitive' } },
+        { username: { equals: identifier, mode: 'insensitive' } }
       ]
     }
   });
@@ -78,80 +57,72 @@ export async function POST(request: Request) {
     return apiError(401, 'Invalid credentials.');
   }
 
-  if (
-    user.lockedUntil &&
-    new Date(user.lockedUntil) > new Date()
-  ) {
-    return apiError(
-      423,
-      'This account is temporarily locked.'
-    );
+  // Check account lock
+  if (user.lockedUntil && user.lockedUntil > new Date()) {
+    return apiError(423, 'This account is temporarily locked.');
   }
 
-  // ✅ نتحقق من SUSPENDED ومقارنة DELETED بتجنب أخطاء النوع
-  if (
-    user.status === 'SUSPENDED' ||
-    (user.status as any) === 'DELETED'
-  ) {
-    return apiError(
-      403,
-      'This account is not available.'
-    );
+  // Check suspended accounts
+  if (user.status === 'SUSPENDED') {
+    return apiError(403, 'This account is not available.');
   }
 
-  // ✅ التحقق من الباسورد من الداتا بيز
-  const validPassword = verifyPassword(
-    password,
-    user.passwordHash
-  );
+  // Verify password
+  const validPassword = verifyPassword(password, user.passwordHash);
 
   if (!validPassword) {
+    const newFailedCount = user.failedLoginCount + 1;
+    const updateData: { failedLoginCount: number; lockedUntil?: Date } = {
+      failedLoginCount: newFailedCount
+    };
+
+    // Lock the account when the threshold is reached
+    if (newFailedCount >= MAX_FAILED_LOGINS) {
+      updateData.lockedUntil = new Date(Date.now() + LOCK_WINDOW_MS);
+    }
+
     await prisma.user.update({
-      where: {
-        id: user.id
-      },
-      data: {
-        failedLoginCount: {
-          increment: 1
-        }
-      }
+      where: { id: user.id },
+      data: updateData
     });
+
+    if (newFailedCount >= MAX_FAILED_LOGINS) {
+      return apiError(423, 'This account is temporarily locked due to too many failed login attempts.');
+    }
 
     return apiError(401, 'Invalid credentials.');
   }
 
-  // ✅ تحديث بيانات تسجيل الدخول
+  // Successful login — reset failed count and unlock
+  const loginUpdate: Record<string, unknown> = {
+    failedLoginCount: 0,
+    lockedUntil: null,
+    lastLoginAt: new Date()
+  };
+
+  // Transparently migrate legacy sha256 hashes to scrypt
+  if (passwordNeedsMigration(user.passwordHash)) {
+    loginUpdate.passwordHash = hashPassword(password);
+  }
+
   await prisma.user.update({
-    where: {
-      id: user.id
-    },
-    data: {
-      failedLoginCount: 0,
-      lockedUntil: null,
-      lastLoginAt: new Date(),
-      updatedAt: new Date(),
-      status: 'ACTIVE'
-    }
+    where: { id: user.id },
+    data: loginUpdate
   });
 
-  // ✅ إنشاء Session
-  const { token, expiresAt } =
-    await createSession(user.id, {
-      rememberMe,
-      request
-    });
+  // Create session
+  const { token, expiresAt } = await createSession(user.id, {
+    rememberMe,
+    request
+  });
 
   const response = apiJson({
-    user: sanitizeUser(user as any),
+    user: sanitizeUser(user),
     accessToken: token,
     expiresAt
   });
 
-  applySessionCookie(
-    response,
-    token,
-    expiresAt
-  );
+  applySessionCookie(response, token, expiresAt);
 
   return response;
 }

@@ -1,18 +1,15 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/server/session';
+import { prisma } from '@/lib/server/db';
 import {
-  createCaseRecord,
-  hydrateCase,
-  inferCategory,
   parseOptionalDate,
   parseOptionalNumber,
   parseOptionalString,
-  readStore,
-  updateStore,
-  upsertPotentialMatchesForCaseAsync,
-  upsertPreviewSelectedMatch
-} from '@/lib/server/store';
-import { ensureSameOrigin } from '@/lib/server/security';
+  inferCategory,
+  ensureSameOrigin
+} from '@/lib/server/security';
+import { hydrateCase } from '@/lib/server/case-helpers';
+import { upsertPotentialMatchesForCase } from '@/lib/server/match-helpers';
 
 export const runtime = 'nodejs';
 
@@ -20,6 +17,17 @@ function isValidCoordinate(latitude?: number, longitude?: number) {
   if (latitude === undefined && longitude === undefined) return true;
   if (latitude === undefined || longitude === undefined) return false;
   return latitude >= -90 && latitude <= 90 && longitude >= -180 && longitude <= 180;
+}
+
+async function nextReferenceCode() {
+  const cases = await prisma.caseItem.findMany({
+    select: { referenceCode: true }
+  });
+  const codes = cases
+    .map((item) => Number(String(item.referenceCode).replace(/[^0-9]/g, '')))
+    .filter((value) => Number.isFinite(value));
+  const next = Math.max(2000, ...codes) + 1;
+  return `RTN-${next}`;
 }
 
 export async function POST(request: Request) {
@@ -36,11 +44,13 @@ export async function POST(request: Request) {
   const estimatedName = parseOptionalString(body.estimatedName ?? body.name) || 'Unknown person or item';
   const age = parseOptionalNumber(body.age);
   const locationText = parseOptionalString(body.locationText ?? body.location);
-  const foundAt = parseOptionalDate(body.foundAt ?? body.dateTime);
+  const foundAtStr = parseOptionalDate(body.foundAt ?? body.dateTime);
+  const foundAt = foundAtStr ? new Date(foundAtStr) : undefined;
   const description = parseOptionalString(body.description);
   const clothesColor = parseOptionalString(body.clothesColor);
   const latitude = parseOptionalNumber(body.latitude);
   const longitude = parseOptionalNumber(body.longitude);
+
   if (age === undefined) {
     return NextResponse.json({ error: 'Age is required for every report.' }, { status: 400 });
   }
@@ -65,15 +75,16 @@ export async function POST(request: Request) {
 
   const seedMatch = typeof body.seedMatch === 'object' && body.seedMatch ? body.seedMatch as Record<string, unknown> : undefined;
 
-  let createdId = '';
-  await updateStore(async (store) => {
-    const images = Array.isArray(body.images)
-      ? body.images.filter((item: unknown): item is string => typeof item === 'string' && item.trim().length > 0).slice(0, 4)
-      : parseOptionalString(body.photo)
-        ? [String(body.photo)]
-        : [];
+  const imageList = Array.isArray(body.images)
+    ? body.images.filter((item: unknown): item is string => typeof item === 'string' && item.trim().length > 0).slice(0, 4)
+    : parseOptionalString(body.photo)
+      ? [String(body.photo)]
+      : [];
 
-    const created = createCaseRecord(store, {
+  const refCode = await nextReferenceCode();
+
+  const createdCase = await prisma.caseItem.create({
+    data: {
       ownerUserId: user.id,
       type: 'FOUND',
       status: 'UNDER_REVIEW',
@@ -89,37 +100,88 @@ export async function POST(request: Request) {
       longitude,
       eventTime: foundAt,
       foundAt,
-      images,
-      aiAnalysis: typeof body.aiAnalysis === 'object' && body.aiAnalysis ? body.aiAnalysis : undefined,
-      skipAutoMatch: true
-    });
-    createdId = created.id;
-    await upsertPotentialMatchesForCaseAsync(store, created);
-
-    const otherCaseId = parseOptionalString(seedMatch?.otherCaseId);
-    if (otherCaseId) {
-      upsertPreviewSelectedMatch(store, {
-        savedCaseId: created.id,
-        otherCaseId,
-        score: parseOptionalNumber(seedMatch?.score),
-        reason: parseOptionalString(seedMatch?.reason),
-        imageScore: parseOptionalNumber(seedMatch?.imageScore),
-        similarity: parseOptionalNumber(seedMatch?.similarity),
-        confidence: parseOptionalNumber(seedMatch?.confidence),
-        aiPriorityApplied: seedMatch?.aiPriorityApplied === true || seedMatch?.usedAiPhotoPriority === true,
-        usedOnlineAi: seedMatch?.usedOnlineAi === true,
-        decision: seedMatch?.decision === 'Accepted Match' || seedMatch?.decision === 'Manual Review' || seedMatch?.decision === 'No Match' ? seedMatch.decision : undefined,
-        manualReview: seedMatch?.manualReview === true,
-        scoreBreakdown: typeof seedMatch?.scoreBreakdown === 'object' && seedMatch?.scoreBreakdown ? seedMatch.scoreBreakdown as any : undefined
-      });
+      referenceCode: refCode,
+      images: {
+        create: imageList.map((url: string, idx: number) => ({
+          imageUrl: url,
+          sortOrder: idx
+        }))
+      },
+      statusHistory: {
+        create: {
+          status: 'UNDER_REVIEW',
+          changedByUserId: user.id,
+          note: 'Case created'
+        }
+      }
+    },
+    include: {
+      owner: true,
+      images: true
     }
   });
 
-  const store = await readStore();
-  const created = store.cases.find((item) => item.id === createdId);
-  if (!created) {
-    return NextResponse.json({ error: 'Unable to create the case.' }, { status: 500 });
+  await prisma.notification.create({
+    data: {
+      userId: user.id,
+      title: 'Report saved',
+      body: `${estimatedName} was saved as ${refCode}.`,
+      type: 'case_created',
+      relatedCaseId: createdCase.id
+    }
+  });
+
+  // Run match heuristic
+  await upsertPotentialMatchesForCase({
+    id: createdCase.id,
+    type: createdCase.type,
+    category: createdCase.category,
+    gender: createdCase.gender,
+    age: createdCase.age,
+    fullName: createdCase.fullName,
+    estimatedName: createdCase.estimatedName
+  });
+
+  const otherCaseId = parseOptionalString(seedMatch?.otherCaseId);
+  if (otherCaseId) {
+    const existingMatch = await prisma.caseMatch.findFirst({
+      where: {
+        missingCaseId: otherCaseId,
+        foundCaseId: createdCase.id
+      }
+    });
+
+    if (!existingMatch) {
+      const matchScore = parseOptionalNumber(seedMatch?.score) ?? 0.8;
+      await prisma.caseMatch.create({
+        data: {
+          missingCaseId: otherCaseId,
+          foundCaseId: createdCase.id,
+          score: matchScore,
+          source: 'ai_face_match',
+          status: 'PENDING'
+        }
+      });
+
+      // Get missing case to notify owner
+      const missingCase = await prisma.caseItem.findUnique({
+        where: { id: otherCaseId }
+      });
+      if (missingCase?.ownerUserId) {
+        await prisma.notification.create({
+          data: {
+            userId: missingCase.ownerUserId,
+            title: 'Possible match detected',
+            body: `A found report may match ${missingCase.fullName || 'Unknown'}.`,
+            type: 'match',
+            relatedCaseId: missingCase.id
+          }
+        });
+      }
+    }
   }
 
-  return NextResponse.json({ item: hydrateCase(created, store, true) }, { status: 201 });
+  const hydrated = await hydrateCase(createdCase, true);
+
+  return NextResponse.json({ item: hydrated }, { status: 201 });
 }

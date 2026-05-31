@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/server/session';
 import { ensureSameOrigin, hashValue, publicBaseUrl, sanitizePlainText } from '@/lib/server/security';
-import { createOrUpdateDevice, readStore, updateStore } from '@/lib/server/store';
+import { prisma } from '@/lib/server/db';
 import { capabilitiesFromDevice, resolveHardwareModelKey } from '@/lib/device-models';
 
 export const runtime = 'nodejs';
@@ -25,74 +25,109 @@ export async function POST(request: Request, context: { params: Promise<{ profil
   const hardwareToken = randomBytes(18).toString('hex').toUpperCase();
 
   try {
-    await updateStore((store) => {
-      const profile = store.identificationProfiles.find((item) => item.id === profileId && item.ownerUserId === user.id);
-      if (!profile) {
-        throw new Error('NOT_FOUND');
-      }
-      profile.nfcTagUid = nfcTagUid;
-      profile.updatedAt = new Date().toISOString();
-      createOrUpdateDevice(store, {
-        ownerUserId: user.id,
-        type: 'NFC',
-        hardwareModel,
-        supportsNfc: capabilityPreset.supportsNfc,
-        supportsBarcode: capabilityPreset.supportsBarcode,
-        supportsGps: capabilityPreset.supportsGps,
-        serialNumber: `NFC-${nfcTagUid}`,
-        label: `${profile.displayName} ${hardwareModel === 'SMART_TAG_PRO' ? 'Smart Tag Pro' : 'Smart Tag Lite'}`,
-        linkedProfileId: profile.id,
-        trackingEnabled: capabilityPreset.defaultTracking,
-        updateIntervalMinutes: capabilityPreset.defaultIntervalMinutes,
-        hardwareBridge: {
-          ready: true,
-          protocol: 'HTTP',
-          ingressPath: '/api/hardware/nfc/scan',
-          gpsIngressPath: capabilityPreset.supportsGps ? '/api/hardware/devices/telemetry' : undefined,
-          publicUrl: `/identify/${profile.qrPublicToken}`,
-          headerName: 'x-device-token',
-          tokenHash: hashValue(hardwareToken),
-          tokenPreview: `${hardwareToken.slice(0, 6)}...${hardwareToken.slice(-4)}`,
-          tokenIssuedAt: new Date().toISOString()
-        }
-      });
+    const profile = await prisma.identificationProfile.findFirst({
+      where: { id: profileId, ownerUserId: user.id }
     });
-  } catch (error) {
-    if (error instanceof Error && error.message === 'NOT_FOUND') {
+
+    if (!profile) {
       return NextResponse.json({ error: 'Profile not found.' }, { status: 404 });
     }
-    throw error;
-  }
 
-  const store = await readStore();
-  const profile = store.identificationProfiles.find((item) => item.id === profileId && item.ownerUserId === user.id);
-  if (!profile) {
-    return NextResponse.json({ error: 'Profile not found.' }, { status: 404 });
-  }
-  const device = store.devices.find((item) => item.ownerUserId === user.id && item.type === 'NFC' && item.linkedProfileId === profile.id && item.serialNumber === `NFC-${profile.nfcTagUid}`);
-  const baseUrl = publicBaseUrl(request);
-  return NextResponse.json({
-    success: true,
-    nfcTagUid: profile.nfcTagUid,
-    hardwareModel,
-    capabilities: {
-      supportsNfc: capabilityPreset.supportsNfc,
-      supportsBarcode: capabilityPreset.supportsBarcode,
-      supportsGps: capabilityPreset.supportsGps
-    },
-    hardware: {
+    const hardwareBridge = {
       ready: true,
-      endpointPath: '/api/hardware/nfc/scan',
-      endpointUrl: `${baseUrl}/api/hardware/nfc/scan`,
-      telemetryPath: capabilityPreset.supportsGps ? '/api/hardware/devices/telemetry' : undefined,
-      telemetryUrl: capabilityPreset.supportsGps ? `${baseUrl}/api/hardware/devices/telemetry` : undefined,
+      protocol: 'HTTP',
+      ingressPath: '/api/hardware/nfc/scan',
+      gpsIngressPath: capabilityPreset.supportsGps ? '/api/hardware/devices/telemetry' : undefined,
+      publicUrl: `/identify/${profile.qrPublicToken}`,
       headerName: 'x-device-token',
-      deviceToken: hardwareToken,
-      tokenPreview: device?.hardwareBridge?.tokenPreview || `${hardwareToken.slice(0, 6)}...${hardwareToken.slice(-4)}`,
-      publicUrl: `${baseUrl}/identify/${profile.qrPublicToken}`,
-      deviceId: device?.id,
-      serialNumber: device?.serialNumber,
-      barcodeReady: true
-    }
-  });
+      tokenHash: hashValue(hardwareToken),
+      tokenPreview: `${hardwareToken.slice(0, 6)}...${hardwareToken.slice(-4)}`,
+      tokenIssuedAt: new Date().toISOString()
+    };
+
+    let device: any;
+    await prisma.$transaction(async (tx) => {
+      // 1. Update profile with NFC Tag UID
+      await tx.identificationProfile.update({
+        where: { id: profileId },
+        data: { nfcTagUid }
+      });
+
+      // 2. Upsert NFC Device
+      device = await tx.device.upsert({
+        where: { serialNumber: `NFC-${nfcTagUid}` },
+        update: {
+          ownerUserId: user.id,
+          hardwareModel,
+          supportsNfc: capabilityPreset.supportsNfc,
+          supportsBarcode: capabilityPreset.supportsBarcode,
+          supportsGps: capabilityPreset.supportsGps,
+          label: `${profile.displayName} ${hardwareModel === 'SMART_TAG_PRO' ? 'Smart Tag Pro' : 'Smart Tag Lite'}`,
+          trackingEnabled: capabilityPreset.defaultTracking,
+          updateIntervalMinutes: capabilityPreset.defaultIntervalMinutes,
+          hardwareBridge: hardwareBridge as any
+        },
+        create: {
+          ownerUserId: user.id,
+          type: 'NFC',
+          hardwareModel,
+          supportsNfc: capabilityPreset.supportsNfc,
+          supportsBarcode: capabilityPreset.supportsBarcode,
+          supportsGps: capabilityPreset.supportsGps,
+          serialNumber: `NFC-${nfcTagUid}`,
+          label: `${profile.displayName} ${hardwareModel === 'SMART_TAG_PRO' ? 'Smart Tag Pro' : 'Smart Tag Lite'}`,
+          trackingEnabled: capabilityPreset.defaultTracking,
+          updateIntervalMinutes: capabilityPreset.defaultIntervalMinutes,
+          hardwareBridge: hardwareBridge as any
+        }
+      });
+
+      // 3. Create link if not exists
+      const existingLink = await tx.deviceLink.findFirst({
+        where: {
+          deviceId: device.id,
+          profileId: profile.id,
+          unlinkedAt: null
+        }
+      });
+
+      if (!existingLink) {
+        await tx.deviceLink.create({
+          data: {
+            deviceId: device.id,
+            profileId: profile.id
+          }
+        });
+      }
+    });
+
+    const baseUrl = publicBaseUrl(request);
+    return NextResponse.json({
+      success: true,
+      nfcTagUid,
+      hardwareModel,
+      capabilities: {
+        supportsNfc: capabilityPreset.supportsNfc,
+        supportsBarcode: capabilityPreset.supportsBarcode,
+        supportsGps: capabilityPreset.supportsGps
+      },
+      hardware: {
+        ready: true,
+        endpointPath: '/api/hardware/nfc/scan',
+        endpointUrl: `${baseUrl}/api/hardware/nfc/scan`,
+        telemetryPath: capabilityPreset.supportsGps ? '/api/hardware/devices/telemetry' : undefined,
+        telemetryUrl: capabilityPreset.supportsGps ? `${baseUrl}/api/hardware/devices/telemetry` : undefined,
+        headerName: 'x-device-token',
+        deviceToken: hardwareToken,
+        tokenPreview: `${hardwareToken.slice(0, 6)}...${hardwareToken.slice(-4)}`,
+        publicUrl: `${baseUrl}/identify/${profile.qrPublicToken}`,
+        deviceId: device?.id,
+        serialNumber: device?.serialNumber,
+        barcodeReady: true
+      }
+    });
+  } catch (error) {
+    console.error('[NfcRegister] Error:', error);
+    return NextResponse.json({ error: 'Failed to register NFC Tag' }, { status: 500 });
+  }
 }

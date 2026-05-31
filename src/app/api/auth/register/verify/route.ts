@@ -1,17 +1,11 @@
 import { applySessionCookie, createSession } from '@/lib/server/session';
 import { checkRateLimit } from '@/lib/server/rate-limit';
 import { apiError, apiJson, readJsonBody, requireSameOrigin } from '@/lib/server/http';
-import { getClientIp, getUserAgent, hashValue } from '@/lib/server/security';
-import {
-  buildMyStats,
-  createUserAccount,
-  hashPassword,
-  readStore,
-  recordAuditLog,
-  sanitizeUser,
-  updateStore,
-  verifyOneTimeCode
-} from '@/lib/server/store';
+import { getClientIp } from '@/lib/server/security';
+import { hashPassword, sanitizeUser } from '@/lib/server/auth-helpers';
+import { verifyOneTimeCode } from '@/lib/server/verification';
+import { buildMyStats } from '@/lib/server/dashboard-helpers';
+import { prisma } from '@/lib/server/db';
 
 export const runtime = 'nodejs';
 
@@ -24,7 +18,6 @@ export async function POST(request: Request) {
   const code = String(body.code || '').trim();
   const rememberMe = body.rememberMe !== false;
   const ip = getClientIp(request) || 'unknown';
-  const userAgent = getUserAgent(request);
 
   const rate = checkRateLimit(`register-verify:${ip}:${email.toLowerCase()}`, 10, 15 * 60 * 1000);
   if (!rate.allowed) {
@@ -33,59 +26,70 @@ export async function POST(request: Request) {
 
   if (!email || !code) return apiError(400, 'Email and verification code are required.');
 
-  let createdUserId = '';
   try {
-    await updateStore((draft) => {
-      const verification = verifyOneTimeCode(draft, { purpose: 'REGISTER', email, code });
-      if (!verification.ok) throw new Error(verification.reason);
+    const verification = await verifyOneTimeCode({ purpose: 'REGISTER', email, code });
+    if (!verification.ok) {
+      return apiError(400, verification.reason);
+    }
 
-      const payload = verification.entry.payload || {};
-      const createdUser = createUserAccount(draft, {
-        name: String(payload.name || '').trim(),
-        username: typeof payload.username === 'string' ? payload.username : undefined,
-        email: typeof payload.email === 'string' ? payload.email : email,
-        phone: typeof payload.phone === 'string' ? payload.phone : undefined,
-        dateOfBirth: typeof payload.dateOfBirth === 'string' ? payload.dateOfBirth : undefined,
-        avatarUrl: typeof payload.avatarUrl === 'string' ? payload.avatarUrl : undefined,
-        passwordHash: hashPassword(String(payload.password || '')),
-        status: 'ACTIVE'
+    const payload = (verification.entry.payload as any) || {};
+    const passwordHash = hashPassword(String(payload.password || ''));
+
+    const createdUser = await prisma.$transaction(async (tx) => {
+      const existingEmail = await tx.user.findFirst({
+        where: { email: { equals: email, mode: 'insensitive' } }
       });
-      createdUserId = createdUser.id;
-      recordAuditLog(draft, {
-        event: 'auth_register_verified',
-        severity: 'info',
-        userId: createdUser.id,
-        ipHash: hashValue(ip),
-        userAgent,
-        details: { email: createdUser.email }
+      if (existingEmail) throw new Error('EMAIL_TAKEN');
+
+      if (payload.username) {
+        const existingUsername = await tx.user.findFirst({
+          where: { username: { equals: payload.username, mode: 'insensitive' } }
+        });
+        if (existingUsername) throw new Error('USERNAME_TAKEN');
+      }
+
+      return tx.user.create({
+        data: {
+          name: String(payload.name || '').trim(),
+          username: payload.username || undefined,
+          email: email.trim().toLowerCase(),
+          phone: payload.phone || undefined,
+          dateOfBirth: payload.dateOfBirth || undefined,
+          avatarUrl: payload.avatarUrl || undefined,
+          passwordHash,
+          status: 'ACTIVE',
+          emailVerifiedAt: new Date(),
+          preference: {
+            create: {
+              language: 'en',
+              darkMode: false,
+              notificationsEnabled: true
+            }
+          }
+        }
       });
     });
-  } catch (error) {
+
+    const { token, expiresAt } = await createSession(createdUser.id, { rememberMe, request });
+    const stats = await buildMyStats(createdUser.id);
+
+    const response = apiJson({
+      user: sanitizeUser(createdUser),
+      accessToken: token,
+      expiresAt,
+      stats,
+      message: 'Email verified and account created successfully.'
+    });
+
+    applySessionCookie(response, token, expiresAt);
+    return response;
+  } catch (error: any) {
     if (error instanceof Error) {
       const codeOrMessage = error.message;
-      if (['No active verification request was found.', 'This code has expired. Please request a new one.', 'Too many invalid attempts. Please request a new code.', 'The verification code is incorrect.'].includes(codeOrMessage)) {
-        return apiError(400, codeOrMessage);
-      }
       if (codeOrMessage === 'EMAIL_TAKEN') return apiError(409, 'An account with this email already exists.');
       if (codeOrMessage === 'USERNAME_TAKEN') return apiError(409, 'This username is already taken.');
-      if (codeOrMessage === 'INVALID_EMAIL') return apiError(400, 'Please enter a valid email address.');
-      if (codeOrMessage === 'INVALID_USERNAME') return apiError(400, 'Please choose a valid username.');
     }
-    throw error;
+    console.error('[RegisterVerify] Error:', error);
+    return apiError(500, 'Unable to create the account.');
   }
-
-  const store = await readStore();
-  const createdUser = store.users.find((user) => user.id === createdUserId);
-  if (!createdUser) return apiError(500, 'Unable to create the account.');
-
-  const { token, expiresAt } = await createSession(createdUser.id, { rememberMe, request });
-  const response = apiJson({
-    user: sanitizeUser(createdUser),
-    accessToken: token,
-    expiresAt,
-    stats: buildMyStats(store, createdUser.id),
-    message: 'Email verified and account created successfully.'
-  });
-  applySessionCookie(response, token, expiresAt);
-  return response;
 }

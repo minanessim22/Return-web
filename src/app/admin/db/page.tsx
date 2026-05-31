@@ -171,11 +171,11 @@ export default function AdminDatabasePage() {
         <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
           <div>
             <p className="text-xs font-black uppercase tracking-[0.25em] text-white/70">Admin database</p>
-            <h1 className="mt-2 text-3xl font-black md:text-5xl">SQLite tables viewer</h1>
+            <h1 className="mt-2 text-3xl font-black md:text-5xl">Database tables viewer</h1>
             <p className="mt-3 max-w-3xl text-white/75">
               Browse live tables in a compact layout, inspect the selected row in a dedicated details panel, and keep large payloads out of the main grid so rows stay readable.
             </p>
-            {dbFile ? <p className="mt-2 text-xs text-white/70">Database file: {dbFile}</p> : null}
+            {dbFile ? <p className="mt-2 text-xs text-white/70">Database connection: {dbFile}</p> : null}
           </div>
           <div className="flex items-center gap-3">
             <Link href="/admin" className="inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/10 px-5 py-3 font-bold transition hover:bg-white/20">
@@ -201,7 +201,7 @@ export default function AdminDatabasePage() {
             <div className="rounded-3xl border border-white/20 bg-white/10 px-5 py-4 shadow-2xl">
               <p className="text-xs font-black uppercase tracking-[0.18em] text-white/70">User rows in table</p>
               <p className="mt-3 text-3xl font-black">{userMetrics.totalRows}</p>
-              <p className="mt-2 text-xs text-white/70">Useful when reviewing the raw users table in SQLite.</p>
+              <p className="mt-2 text-xs text-white/70">Useful when reviewing the raw users table in the database.</p>
             </div>
           </div>
         ) : null}

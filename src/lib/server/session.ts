@@ -2,7 +2,8 @@ import { randomBytes } from 'node:crypto';
 import { cookies } from 'next/headers';
 import type { NextResponse } from 'next/server';
 import { getClientIp, getUserAgent, hashValue } from '@/lib/server/security';
-import { readStore, sanitizeUser, updateStore } from '@/lib/server/store';
+import { sanitizeUser } from '@/lib/server/auth-helpers';
+import { prisma } from '@/lib/server/db';
 
 export const SESSION_COOKIE_NAME = 'return_session';
 
@@ -15,13 +16,12 @@ function sessionDurationMs(rememberMe = true) {
   return rememberMe ? 1000 * 60 * 60 * 24 * 180 : 1000 * 60 * 60 * 24 * 45;
 }
 
-function shouldRefreshLastSeen(lastSeenAt?: string) {
+function shouldRefreshLastSeen(lastSeenAt?: Date) {
   if (!lastSeenAt) return true;
-  const previous = new Date(lastSeenAt).getTime();
+  const previous = lastSeenAt.getTime();
   if (Number.isNaN(previous)) return true;
   return Date.now() - previous >= 1000 * 60 * 5;
 }
-
 
 export async function createSession(
   userId: string,
@@ -30,22 +30,26 @@ export async function createSession(
   const token = randomBytes(32).toString('base64url');
   const rememberMe = options.rememberMe !== false;
   const now = Date.now();
-  const expiresAt = new Date(now + sessionDurationMs(rememberMe)).toISOString();
+  const expiresAt = new Date(now + sessionDurationMs(rememberMe));
   const ip = getClientIp(options.request);
   const userAgent = getUserAgent(options.request);
 
-  await updateStore((store) => {
-    const currentIso = new Date().toISOString();
-    const activeSessions = store.sessions.filter((item) => item.expiresAt > currentIso);
-    const otherUsers = activeSessions.filter((item) => item.userId !== userId);
-    const currentUserSessions = activeSessions
-      .filter((item) => item.userId === userId)
-      .sort((left, right) => (left.lastSeenAt < right.lastSeenAt ? 1 : -1))
-      .slice(0, 4);
+  // Enforce session limit per user: keep latest 3 active sessions (slice(0, 4) limit checking)
+  // const otherUsers = activeSessions.filter((item) => item.userId !== userId)
+  try {
+    const activeSessions = await prisma.session.findMany({
+      where: { userId },
+      orderBy: { lastSeenAt: 'desc' }
+    });
+    if (activeSessions.length >= 4) {
+      const sessionsToDelete = activeSessions.slice(3);
+      await prisma.session.deleteMany({
+        where: { id: { in: sessionsToDelete.map((s) => s.id) } }
+      });
+    }
 
-    store.sessions = [
-      {
-        id: `session_${randomBytes(8).toString('hex')}`,
+    await prisma.session.create({
+      data: {
         userId,
         tokenHash: hashValue(token),
         csrfToken: options.csrfToken,
@@ -53,15 +57,14 @@ export async function createSession(
         userAgent,
         ipHash: ip ? hashValue(ip) : undefined,
         expiresAt,
-        lastSeenAt: new Date().toISOString(),
-        createdAt: new Date().toISOString()
-      },
-      ...currentUserSessions,
-      ...otherUsers
-    ];
-  });
+        lastSeenAt: new Date()
+      }
+    });
+  } catch (err) {
+    console.error('[Session] Failed to create session in database:', err);
+  }
 
-  return { token, expiresAt };
+  return { token, expiresAt: expiresAt.toISOString() };
 }
 
 export function applySessionCookie(response: NextResponse, token: string, expiresAt: string) {
@@ -93,68 +96,90 @@ export async function touchCurrentSession() {
   if (!token) return null;
 
   const tokenHash = hashValue(token);
-  const store = await readStore();
-  const session = store.sessions.find((item) => item.tokenHash === tokenHash);
-  
-  if (!session) return null;
-
-  if (shouldRefreshLastSeen(session.lastSeenAt)) {
-    const newExpiresAt = new Date(Date.now() + sessionDurationMs(session.rememberMe)).toISOString();
-    await updateStore((draft) => {
-      const draftSession = draft.sessions.find((item) => item.tokenHash === tokenHash);
-      if (draftSession) {
-        draftSession.lastSeenAt = new Date().toISOString();
-        draftSession.expiresAt = newExpiresAt;
-      }
+  try {
+    const session = await prisma.session.findFirst({
+      where: { tokenHash }
     });
-    return { token, expiresAt: newExpiresAt };
-  }
 
-  return { token, expiresAt: session.expiresAt };
+    if (!session) return null;
+
+    if (shouldRefreshLastSeen(session.lastSeenAt)) {
+      const newExpiresAt = new Date(Date.now() + sessionDurationMs(session.rememberMe));
+      await prisma.session.update({
+        where: { id: session.id },
+        data: {
+          lastSeenAt: new Date(),
+          expiresAt: newExpiresAt
+        }
+      });
+      return { token, expiresAt: newExpiresAt.toISOString() };
+    }
+
+    return { token, expiresAt: session.expiresAt.toISOString() };
+  } catch (err) {
+    console.error('[Session] Failed to touch session in database:', err);
+    return null;
+  }
 }
 
 export async function destroyCurrentSession() {
   const token = await getTokenFromCookie();
-  if (!token) {
-    return;
-  }
+  if (!token) return;
+
   const tokenHash = hashValue(token);
-  await updateStore((store) => {
-    store.sessions = store.sessions.filter((item) => item.tokenHash !== tokenHash);
-  });
+  try {
+    await prisma.session.deleteMany({
+      where: { tokenHash }
+    });
+  } catch (err) {
+    console.error('[Session] Failed to destroy session in database:', err);
+  }
 }
 
 export async function getCurrentStoredUser() {
   const token = await getTokenFromCookie();
-  if (!token) {
-    return null;
-  }
+  if (!token) return null;
 
   const tokenHash = hashValue(token);
-  const store = await readStore();
-  const session = store.sessions.find((item) => item.tokenHash === tokenHash);
-  if (!session) {
-    return null;
-  }
-  if (session.expiresAt <= new Date().toISOString()) {
-    await updateStore((draft) => {
-      draft.sessions = draft.sessions.filter((item) => item.tokenHash !== tokenHash);
+  try {
+    // Background prune sessions expired more than 24 hours ago
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    prisma.session.deleteMany({
+      where: { expiresAt: { lt: oneDayAgo } }
+    }).catch((err) => {
+      console.error('[Session] Failed to prune expired sessions:', err);
     });
-    return null;
-  }
 
-  if (shouldRefreshLastSeen(session.lastSeenAt)) {
-    await updateStore((draft) => {
-      const current = draft.sessions.find((item) => item.tokenHash === tokenHash);
-      if (current) current.lastSeenAt = new Date().toISOString();
+    const session = await prisma.session.findFirst({
+      where: { tokenHash },
+      include: { user: true }
     });
-  }
 
-  const user = store.users.find((item) => item.id === session.userId) || null;
-  if (!user || user.status === 'DELETED') {
+    if (!session) return null;
+
+    if (session.expiresAt <= new Date()) {
+      await prisma.session.deleteMany({
+        where: { tokenHash }
+      });
+      return null;
+    }
+
+    if (shouldRefreshLastSeen(session.lastSeenAt)) {
+      await prisma.session.update({
+        where: { id: session.id },
+        data: { lastSeenAt: new Date() }
+      });
+    }
+
+    const user = session.user;
+    if (!user || user.status === 'SUSPENDED') {
+      return null;
+    }
+    return user;
+  } catch (err) {
+    console.error('[Session] Failed to retrieve current user from database:', err);
     return null;
   }
-  return user;
 }
 
 export async function getCurrentUser() {

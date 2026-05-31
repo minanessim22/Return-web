@@ -5,8 +5,6 @@ import { apiError, readJsonBody, requireSameOrigin } from '@/lib/server/http';
 import {
   getClientIp,
   getPasswordStrengthMessage,
-  getUserAgent,
-  hashValue,
   isStrongPassword,
   isValidEmail,
   normalizeEmail,
@@ -14,7 +12,8 @@ import {
   normalizeUsername,
   sanitizePlainText
 } from '@/lib/server/security';
-import { createVerificationRequest, readStore, recordAuditLog, updateStore } from '@/lib/server/store';
+import { createVerificationRequest } from '@/lib/server/verification';
+import { prisma } from '@/lib/server/db';
 
 export const runtime = 'nodejs';
 
@@ -31,7 +30,6 @@ export async function POST(request: Request) {
   const password = String(body.password || '');
   const avatarUrl = typeof body.avatarUrl === 'string' ? body.avatarUrl.trim() || undefined : undefined;
   const ip = getClientIp(request) || 'unknown';
-  const userAgent = getUserAgent(request);
 
   const rate = checkRateLimit(`register-code:${ip}:${email}`, 5, 10 * 60 * 1000);
   if (!rate.allowed) {
@@ -44,38 +42,36 @@ export async function POST(request: Request) {
   if (!isValidEmail(email)) return apiError(400, 'Please enter a valid email address.');
   if (!isStrongPassword(password)) return apiError(400, getPasswordStrengthMessage(password));
 
-  const store = await readStore();
-  if (store.users.some((entry) => entry.email === email && entry.status !== 'DELETED')) {
+  const existingEmail = await prisma.user.findFirst({
+    where: { email: { equals: email, mode: 'insensitive' } }
+  });
+  if (existingEmail) {
     return apiError(409, 'An account with this email already exists.');
   }
-  if (requestedUsername && store.users.some((entry) => entry.username === requestedUsername && entry.status !== 'DELETED')) {
-    return apiError(409, 'This username is already taken.');
+
+  if (requestedUsername) {
+    const existingUsername = await prisma.user.findFirst({
+      where: { username: { equals: requestedUsername, mode: 'insensitive' } }
+    });
+    if (existingUsername) {
+      return apiError(409, 'This username is already taken.');
+    }
   }
 
-  let code = '';
-  await updateStore((draft) => {
-    const created = createVerificationRequest(draft, {
-      purpose: 'REGISTER',
+  // Create verification request in database
+  const { code } = await createVerificationRequest({
+    purpose: 'REGISTER',
+    email,
+    payload: {
+      name,
+      username: requestedUsername,
       email,
-      payload: {
-        name,
-        username: requestedUsername,
-        email,
-        phone,
-        dateOfBirth,
-        avatarUrl,
-        password
-      },
-      expiresInMinutes: 10
-    });
-    code = created.code;
-    recordAuditLog(draft, {
-      event: 'auth_register_code_requested',
-      severity: 'info',
-      ipHash: hashValue(ip),
-      userAgent,
-      details: { email }
-    });
+      phone,
+      dateOfBirth,
+      avatarUrl,
+      password
+    },
+    expiresInMinutes: 10
   });
 
   const mail = buildVerificationEmail(code, name);
