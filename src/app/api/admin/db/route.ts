@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/server/db';
-import { getDatabaseHealth, getTableSummary } from '@/lib/server/sqlite-db';
-import { apiJson, requireAdmin } from '@/lib/server/http';
+import { getDatabaseHealth, getTableSummary } from '@/lib/server/tracker-db';
+import { apiJson, requireAdmin, safeServerError } from '@/lib/server/http';
 
 export const runtime = 'nodejs';
 
@@ -24,15 +24,19 @@ export async function GET() {
     return admin.response;
   }
 
-  const userMetrics = await getAdminUserStats();
-  const health = await getDatabaseHealth();
-  const tables = await getTableSummary();
+  try {
+    const userMetrics = await getAdminUserStats();
+    const health = await getDatabaseHealth();
+    const tables = await getTableSummary();
 
-  return apiJson({
-    engine: 'supabase',
-    file: health.file,
-    tables,
-    userMetrics,
-    health
-  });
+    return apiJson({
+      engine: 'supabase',
+      file: health.file,
+      tables,
+      userMetrics,
+      health
+    });
+  } catch (error) {
+    return safeServerError(error, 'Failed to retrieve database summary.');
+  }
 }

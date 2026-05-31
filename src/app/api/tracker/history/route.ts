@@ -25,7 +25,7 @@
  * ─────────────────────────────────────────────────────────────────
  */
 
-import { getLocationHistory } from '@/lib/server/sqlite-db';
+import { getLocationHistory } from '@/lib/server/tracker-db';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

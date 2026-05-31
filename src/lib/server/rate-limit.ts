@@ -24,7 +24,48 @@ function pruneExpiredBuckets(now: number) {
   }
 }
 
-export function checkRateLimit(key: string, limit: number, windowMs: number) {
+export async function checkRateLimit(key: string, limit: number, windowMs: number) {
+  const redisUrl = process.env.UPSTASH_REDIS_REST_URL;
+  const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
+
+  if (redisUrl && redisToken) {
+    try {
+      const res = await fetch(`${redisUrl}/pipeline`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${redisToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify([
+          ['INCR', `rate_limit:${key}`],
+          ['TTL', `rate_limit:${key}`]
+        ])
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const count = data[0]?.result;
+        const ttl = data[1]?.result;
+
+        if (count === 1 || ttl === -1) {
+          // Set expiry window
+          await fetch(`${redisUrl}/expire/rate_limit:${key}/${Math.ceil(windowMs / 1000)}`, {
+            headers: { Authorization: `Bearer ${redisToken}` }
+          });
+        }
+
+        return {
+          allowed: count <= limit,
+          remaining: Math.max(0, limit - count),
+          retryAfterMs: ttl > 0 ? ttl * 1000 : windowMs
+        };
+      }
+    } catch (err) {
+      console.error('[Rate Limit] Redis check failed, falling back to memory:', err);
+    }
+  }
+
+  // Local fallback (in-memory)
   const now = Date.now();
   pruneExpiredBuckets(now);
   const bucket = buckets.get(key);

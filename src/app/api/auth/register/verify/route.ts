@@ -19,7 +19,7 @@ export async function POST(request: Request) {
   const rememberMe = body.rememberMe !== false;
   const ip = getClientIp(request) || 'unknown';
 
-  const rate = checkRateLimit(`register-verify:${ip}:${email.toLowerCase()}`, 10, 15 * 60 * 1000);
+  const rate = await checkRateLimit(`register-verify:${ip}:${email.toLowerCase()}`, 10, 15 * 60 * 1000);
   if (!rate.allowed) {
     return apiError(429, 'Too many verification attempts. Please wait and try again.', { retryAfterMs: rate.retryAfterMs });
   }

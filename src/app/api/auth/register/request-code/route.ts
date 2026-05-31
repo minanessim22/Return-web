@@ -31,7 +31,7 @@ export async function POST(request: Request) {
   const avatarUrl = typeof body.avatarUrl === 'string' ? body.avatarUrl.trim() || undefined : undefined;
   const ip = getClientIp(request) || 'unknown';
 
-  const rate = checkRateLimit(`register-code:${ip}:${email}`, 5, 10 * 60 * 1000);
+  const rate = await checkRateLimit(`register-code:${ip}:${email}`, 5, 10 * 60 * 1000);
   if (!rate.allowed) {
     return apiError(429, 'Too many verification attempts. Please wait before trying again.', {
       retryAfterMs: rate.retryAfterMs

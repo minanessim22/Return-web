@@ -1,5 +1,5 @@
-import { apiError, apiJson, clampInteger, requireAdmin } from '@/lib/server/http';
-import { readTableData } from '@/lib/server/sqlite-db';
+import { apiError, apiJson, clampInteger, requireAdmin, safeServerError } from '@/lib/server/http';
+import { readTableData } from '@/lib/server/tracker-db';
 
 export const runtime = 'nodejs';
 
@@ -20,6 +20,6 @@ export async function GET(request: Request, context: { params: Promise<{ table: 
     if (error instanceof Error && error.message === 'TABLE_NOT_FOUND') {
       return apiError(404, 'Table not found.');
     }
-    throw error;
+    return safeServerError(error, 'Failed to retrieve table data.');
   }
 }

@@ -1,9 +1,11 @@
 import { prisma } from '@/lib/server/db';
 import { applySessionCookie, createSession } from '@/lib/server/session';
-import { getClientIp, hashValue } from '@/lib/server/security';
+import { getClientIp, getUserAgent } from '@/lib/server/security';
 import { apiError, apiJson, readJsonBody, requireSameOrigin } from '@/lib/server/http';
 import { checkRateLimit } from '@/lib/server/rate-limit';
 import { verifyPassword, sanitizeUser, passwordNeedsMigration, hashPassword } from '@/lib/server/auth-helpers';
+import { logSecurityEvent } from '@/lib/server/logger';
+import { logAuditEvent } from '@/lib/server/audit';
 
 export const runtime = 'nodejs';
 
@@ -28,14 +30,22 @@ export async function POST(request: Request) {
   const password = String(body.password || '');
   const rememberMe = body.rememberMe !== false;
   const ip = getClientIp(request) || 'unknown';
+  const userAgent = getUserAgent(request) || 'unknown';
 
-  const rate = checkRateLimit(
+  const rate = await checkRateLimit(
     `login:${ip}:${identifier.toLowerCase()}`,
     10,
     15 * 60 * 1000
   );
 
   if (!rate.allowed) {
+    logAuditEvent({
+      eventType: 'RATE_LIMIT_HIT',
+      severity: 'warn',
+      metadata: { path: '/api/auth/login', identifier },
+      ip,
+      userAgent
+    });
     return apiError(429, 'Too many login attempts.');
   }
 
@@ -53,22 +63,51 @@ export async function POST(request: Request) {
     }
   });
 
+  // Timing attack mitigation: run verifyPassword on a dummy hash if user is not found
+  const dummyHash = 'scrypt:a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4:a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4';
+  const targetHash = user ? user.passwordHash : dummyHash;
+  const validPassword = verifyPassword(password, targetHash);
+
   if (!user) {
+    logSecurityEvent({ type: 'LOGIN_NONEXISTENT', ip, identifier });
+    logAuditEvent({
+      eventType: 'LOGIN_FAILED_NONEXISTENT',
+      severity: 'warn',
+      metadata: { identifier },
+      ip,
+      userAgent
+    });
     return apiError(401, 'Invalid credentials.');
   }
 
   // Check account lock
   if (user.lockedUntil && user.lockedUntil > new Date()) {
+    logSecurityEvent({ type: 'LOGIN_LOCKED', ip, identifier: user.email, userId: user.id });
+    logAuditEvent({
+      userId: user.id,
+      eventType: 'LOGIN_LOCKED_ATTEMPT',
+      severity: 'critical',
+      target: `user:${user.id}`,
+      metadata: { email: user.email },
+      ip,
+      userAgent
+    });
     return apiError(423, 'This account is temporarily locked.');
   }
 
   // Check suspended accounts
   if (user.status === 'SUSPENDED') {
+    logSecurityEvent({ type: 'LOGIN_SUSPENDED', ip, identifier: user.email, userId: user.id });
+    logAuditEvent({
+      userId: user.id,
+      eventType: 'LOGIN_SUSPENDED_ATTEMPT',
+      severity: 'warn',
+      target: `user:${user.id}`,
+      ip,
+      userAgent
+    });
     return apiError(403, 'This account is not available.');
   }
-
-  // Verify password
-  const validPassword = verifyPassword(password, user.passwordHash);
 
   if (!validPassword) {
     const newFailedCount = user.failedLoginCount + 1;
@@ -86,6 +125,17 @@ export async function POST(request: Request) {
       data: updateData
     });
 
+    logSecurityEvent({ type: 'LOGIN_FAILED', ip, identifier: user.email, userId: user.id, meta: { failedCount: newFailedCount } });
+    logAuditEvent({
+      userId: user.id,
+      eventType: newFailedCount >= MAX_FAILED_LOGINS ? 'LOGIN_LOCKED' : 'LOGIN_FAILED',
+      severity: newFailedCount >= MAX_FAILED_LOGINS ? 'critical' : 'warn',
+      target: `user:${user.id}`,
+      metadata: { failedCount: newFailedCount, email: user.email },
+      ip,
+      userAgent
+    });
+
     if (newFailedCount >= MAX_FAILED_LOGINS) {
       return apiError(423, 'This account is temporarily locked due to too many failed login attempts.');
     }
@@ -94,7 +144,12 @@ export async function POST(request: Request) {
   }
 
   // Successful login — reset failed count and unlock
-  const loginUpdate: Record<string, unknown> = {
+  const loginUpdate: {
+    failedLoginCount: number;
+    lockedUntil: Date | null;
+    lastLoginAt: Date;
+    passwordHash?: string;
+  } = {
     failedLoginCount: 0,
     lockedUntil: null,
     lastLoginAt: new Date()
@@ -108,6 +163,16 @@ export async function POST(request: Request) {
   await prisma.user.update({
     where: { id: user.id },
     data: loginUpdate
+  });
+
+  logSecurityEvent({ type: 'LOGIN_SUCCESS', ip, identifier: user.email, userId: user.id });
+  logAuditEvent({
+    userId: user.id,
+    eventType: 'LOGIN_SUCCESS',
+    severity: 'info',
+    target: `user:${user.id}`,
+    ip,
+    userAgent
   });
 
   // Create session

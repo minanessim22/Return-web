@@ -2,8 +2,6 @@
  * Database helpers for tracker telemetry and admin views.
  *
  * All persistence uses Prisma → PostgreSQL (Supabase).
- * The "sqlite-db" filename is kept for import compatibility;
- * no actual SQLite code remains.
  */
 
 import crypto from 'node:crypto';
@@ -47,9 +45,6 @@ export async function getTableSummary() {
   return summary;
 }
 
-/** Kept as alias for backward compatibility with admin routes */
-export const getSqliteSummary = getTableSummary;
-
 // ── Database Health ──────────────────────────────────────────────
 
 export async function getDatabaseHealth() {
@@ -64,9 +59,6 @@ export async function getDatabaseHealth() {
     indexedTables: ['users', 'sessions', 'cases', 'case_matches', 'location_history', 'devices', 'notifications']
   };
 }
-
-/** Kept as alias for backward compatibility */
-export const getSqliteHealth = getDatabaseHealth;
 
 // ── Admin Table Reader ───────────────────────────────────────────
 
@@ -143,9 +135,6 @@ export async function readTableData(tableName: string, limit = 100, offset = 0) 
   }
 }
 
-/** Kept as alias for backward compatibility */
-export const readSqliteTable = readTableData;
-
 /** List all Prisma-managed tables with row counts */
 export async function listTables() {
   const entries = Object.entries(TABLE_TO_MODEL);
@@ -160,9 +149,6 @@ export async function listTables() {
   }
   return result;
 }
-
-/** Kept as alias for backward compatibility */
-export const listSqliteTables = listTables;
 
 // ── Location History API ──────────────────────────────────────────
 

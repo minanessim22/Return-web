@@ -16,7 +16,7 @@ export async function POST(request: Request) {
   const email = normalizeEmail(String(body.email || ''));
   const ip = getClientIp(request) || 'unknown';
 
-  const rate = checkRateLimit(`password-code:${ip}:${email}`, 5, 10 * 60 * 1000);
+  const rate = await checkRateLimit(`password-code:${ip}:${email}`, 5, 10 * 60 * 1000);
   if (!rate.allowed) {
     return apiError(429, 'Too many password reset attempts. Please wait before trying again.', {
       retryAfterMs: rate.retryAfterMs

@@ -3,6 +3,7 @@ import { getCurrentUser } from '@/lib/server/session';
 import { ensureSameOrigin, getClientIp } from '@/lib/server/security';
 import { checkRateLimit } from '@/lib/server/rate-limit';
 import type { PublicUser } from '@/lib/shared-types';
+import { captureException } from '@/lib/sentry';
 
 export function apiJson(data: unknown, init?: ResponseInit) {
   const response = NextResponse.json(data, init);
@@ -14,6 +15,18 @@ export function apiJson(data: unknown, init?: ResponseInit) {
 
 export function apiError(status: number, error: string, extra?: Record<string, unknown>) {
   return apiJson({ error, ...(extra || {}) }, { status });
+}
+
+export function safeServerError(err: unknown, customMessage = 'Internal server error.') {
+  console.error('[ServerError]', err);
+  // Send exception to Sentry (fire-and-forget)
+  captureException(err).catch((sentryErr) => {
+    console.error('[SentryError]', sentryErr);
+  });
+  const errorMsg = process.env.NODE_ENV === 'production'
+    ? customMessage
+    : err instanceof Error ? err.message : String(err);
+  return apiError(500, errorMsg);
 }
 
 export async function readJsonBody<T extends Record<string, unknown> = Record<string, unknown>>(request: Request) {
@@ -49,11 +62,11 @@ export function clampInteger(value: string | null, minimum: number, maximum: num
   return Math.min(maximum, Math.max(minimum, Math.trunc(parsed)));
 }
 
-export function enforceRateLimit(input: { request: Request; label: string; limit: number; windowMs: number; user?: Pick<PublicUser, 'id'> | null; extraKey?: string }) {
+export async function enforceRateLimit(input: { request: Request; label: string; limit: number; windowMs: number; user?: Pick<PublicUser, 'id'> | null; extraKey?: string }) {
   const ip = getClientIp(input.request) || 'unknown';
   const subject = input.user?.id || ip;
   const suffix = input.extraKey ? `:${input.extraKey}` : '';
-  const bucket = checkRateLimit(`${input.label}:${subject}${suffix}`, input.limit, input.windowMs);
+  const bucket = await checkRateLimit(`${input.label}:${subject}${suffix}`, input.limit, input.windowMs);
   if (bucket.allowed) return null;
   return apiError(429, 'Too many requests. Please try again in a moment.', {
     retryAfterMs: bucket.retryAfterMs

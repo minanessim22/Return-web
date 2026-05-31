@@ -16,7 +16,7 @@ export async function POST(request: Request, context: { params: Promise<{ conver
   }
 
   const { conversationId } = await context.params;
-  const rateError = enforceRateLimit({
+  const rateError = await enforceRateLimit({
     request,
     user: auth.user,
     label: 'conversation-message',

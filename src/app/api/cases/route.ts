@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/server/session';
 import { hydrateCase } from '@/lib/server/case-helpers';
 import { prisma } from '@/lib/server/db';
+import { getCachedPublicCases } from '@/lib/server/cache';
 
 export const runtime = 'nodejs';
 
@@ -73,17 +74,33 @@ export async function GET(request: Request) {
       orderBy = { updatedAt: 'desc' };
     }
 
-    const total = await prisma.caseItem.count({ where });
-    const cases = await prisma.caseItem.findMany({
-      where,
-      include: {
-        images: true,
-        owner: true
-      },
-      orderBy,
-      skip: (page - 1) * limit,
-      take: limit
-    });
+    let total: number;
+    let cases: any[];
+
+    if (ownerFilter === 'me') {
+      // User-private data: bypass cache completely to avoid data leakage
+      total = await prisma.caseItem.count({ where });
+      cases = await prisma.caseItem.findMany({
+        where,
+        include: {
+          images: true,
+          owner: true
+        },
+        orderBy,
+        skip: (page - 1) * limit,
+        take: limit
+      });
+    } else {
+      // Public data: use cache
+      const cached = await getCachedPublicCases({
+        where,
+        orderBy,
+        skip: (page - 1) * limit,
+        take: limit
+      });
+      total = cached.total;
+      cases = cached.cases;
+    }
 
     const items = await Promise.all(cases.map((c) => hydrateCase(c, true)));
     const totalPages = Math.ceil(total / limit);

@@ -8,7 +8,9 @@
     "postinstall": "prisma generate",
     "start": "next start",
     "lint": "next lint",
-    "test:smoke": "npx --yes tsx tests/server-smoke.ts && npx --yes tsx tests/ai-device-smoke.ts"
+    "test:smoke": "npx --yes tsx tests/server-smoke.ts && npx --yes tsx tests/ai-device-smoke.ts",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
@@ -30,6 +32,7 @@
     "tailwind-merge": "^2.5.4"
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
     "@types/leaflet": "^1.9.21",
     "@types/node": "^22.10.1",
     "@types/nodemailer": "^8.0.0",

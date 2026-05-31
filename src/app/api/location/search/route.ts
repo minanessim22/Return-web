@@ -48,7 +48,7 @@ async function fetchJson(url: string) {
 }
 
 export async function GET(request: Request) {
-  const rateError = enforceRateLimit({
+  const rateError = await enforceRateLimit({
     request,
     label: 'location-search',
     limit: 30,

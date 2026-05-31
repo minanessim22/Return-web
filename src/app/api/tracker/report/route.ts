@@ -28,7 +28,7 @@
 
 import { ensureMqttBridge, getMqttEmitter } from '@/lib/server/mqtt-bridge';
 import type { TrackerLocationEvent } from '@/lib/server/mqtt-bridge';
-import { insertLocationHistory, insertLocationHistoryBatch, isTrackerRegistered } from '@/lib/server/sqlite-db';
+import { insertLocationHistory, insertLocationHistoryBatch, isTrackerRegistered } from '@/lib/server/tracker-db';
 import { prisma } from '@/lib/server/db';
 
 // ── Geofence helpers ──────────────────────────────────────────────

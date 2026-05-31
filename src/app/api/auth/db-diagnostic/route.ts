@@ -23,6 +23,10 @@ export async function GET() {
     error: null as string | null,
   };
 
+function redactSensitiveInfo(msg: string): string {
+  return msg.replace(/(postgres(?:ql)?:\/\/)[^@\s]+@/g, '$1***:***@');
+}
+
   // Test Prisma Connection
   try {
     const userCount = await prisma.user.count();
@@ -32,7 +36,8 @@ export async function GET() {
     diagnostics.counts = { users: userCount, sessions: sessionCount, cases: caseCount };
   } catch (err: unknown) {
     diagnostics.prisma_connection = 'failed';
-    diagnostics.error = err instanceof Error ? err.message : 'Unknown error';
+    const rawError = err instanceof Error ? err.message : 'Unknown error';
+    diagnostics.error = redactSensitiveInfo(rawError);
   }
 
   return apiJson(diagnostics, { status: diagnostics.error ? 500 : 200 });

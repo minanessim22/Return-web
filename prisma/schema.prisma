@@ -69,6 +69,8 @@ model Session {
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([tokenHash])
+  @@index([userId])
+  @@index([expiresAt])
   @@map("sessions")
 }
 
@@ -136,6 +138,7 @@ model CaseImage {
   createdAt DateTime @default(now()) @map("created_at")
   case      CaseItem @relation(fields: [caseId], references: [id], onDelete: Cascade)
 
+  @@index([caseId])
   @@map("case_images")
 }
 
@@ -149,6 +152,8 @@ model CaseStatusHistory {
   case            CaseItem @relation(fields: [caseId], references: [id], onDelete: Cascade)
   changedByUser   User?    @relation("StatusChangedBy", fields: [changedByUserId], references: [id])
 
+  @@index([caseId])
+  @@index([changedByUserId])
   @@map("case_status_history")
 }
 
@@ -233,6 +238,8 @@ model Device {
   gpsLocations          GpsLocation[]
   scanEvents            ScanEvent[]
 
+  @@index([ownerUserId])
+  @@index([status])
   @@map("devices")
 }
 
@@ -245,6 +252,8 @@ model DeviceLink {
   device     Device                @relation(fields: [deviceId], references: [id], onDelete: Cascade)
   profile    IdentificationProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
 
+  @@index([deviceId])
+  @@index([profileId])
   @@map("device_links")
 }
 
@@ -302,6 +311,8 @@ model ScanEvent {
   device    Device?                @relation(fields: [deviceId], references: [id])
   profile   IdentificationProfile? @relation(fields: [profileId], references: [id])
 
+  @@index([profileId])
+  @@index([deviceId])
   @@map("scan_events")
 }
 
@@ -346,6 +357,7 @@ model Conversation {
   relatedCase     CaseItem?                 @relation(fields: [relatedCaseId], references: [id])
   messages        Message[]
 
+  @@index([createdByUserId])
   @@map("conversations")
 }
 
@@ -496,5 +508,24 @@ model Geofence {
 
   owner         User      @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
 
+  @@index([ownerUserId])
+  @@index([deviceId])
   @@map("geofences")
+}
+
+model AuditLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String?  @map("user_id") @db.Uuid
+  eventType String   @map("event_type")
+  severity  String   @default("info")  // info | warn | critical
+  target    String?  // e.g. "user:uuid", "case:uuid"
+  metadata  Json?
+  ip        String?
+  userAgent String?  @map("user_agent")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@index([userId])
+  @@index([eventType])
+  @@map("audit_logs")
 }

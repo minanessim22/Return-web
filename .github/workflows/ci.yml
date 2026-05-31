@@ -1,0 +1,92 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ main, master, dev ]
+  pull_request:
+    branches: [ main, master, dev ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgrespassword
+          POSTGRES_DB: return_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Validate Prisma Schema
+        run: npx prisma validate
+
+      - name: Run Database Migrations/Push (Test DB Setup)
+        env:
+          DATABASE_URL: postgresql://postgres:postgrespassword@localhost:5432/return_test?schema=public
+          DIRECT_URL: postgresql://postgres:postgrespassword@localhost:5432/return_test?schema=public
+        run: npx prisma db push --skip-generate
+
+      - name: Run TypeScript Type Check
+        run: npx tsc --noEmit
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Run Smoke Tests
+        env:
+          DATABASE_URL: postgresql://postgres:postgrespassword@localhost:5432/return_test?schema=public
+          DIRECT_URL: postgresql://postgres:postgrespassword@localhost:5432/return_test?schema=public
+          NEXTAUTH_SECRET: super-secret-fallback-token-for-test-purposes
+          NEXT_PUBLIC_APP_URL: http://localhost:3000
+        run: npm run test:smoke
+
+      - name: Run Playwright E2E Tests
+        env:
+          DATABASE_URL: postgresql://postgres:postgrespassword@localhost:5432/return_test?schema=public
+          DIRECT_URL: postgresql://postgres:postgrespassword@localhost:5432/return_test?schema=public
+          NEXTAUTH_SECRET: super-secret-fallback-token-for-test-purposes
+          NEXT_PUBLIC_APP_URL: http://localhost:3000
+        run: npm run test:e2e
+
+      - name: Build Next.js Application
+        env:
+          DATABASE_URL: postgresql://postgres:postgrespassword@localhost:5432/return_test?schema=public
+          DIRECT_URL: postgresql://postgres:postgrespassword@localhost:5432/return_test?schema=public
+          NEXTAUTH_SECRET: super-secret-fallback-token-for-test-purposes
+          NEXT_PUBLIC_APP_URL: http://localhost:3000
+        run: npm run build
+
+      - name: Upload Playwright Test Report on Failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 15

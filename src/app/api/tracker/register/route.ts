@@ -26,7 +26,7 @@ import {
   unregisterTracker,
   listRegisteredTrackers,
   getRegisteredTracker,
-} from '@/lib/server/sqlite-db';
+} from '@/lib/server/tracker-db';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

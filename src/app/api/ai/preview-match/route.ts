@@ -69,7 +69,7 @@ export async function POST(request: Request) {
     return auth.response!;
   }
 
-  const rateError = enforceRateLimit({
+  const rateError = await enforceRateLimit({
     request,
     user: auth.user,
     label: 'ai-preview',

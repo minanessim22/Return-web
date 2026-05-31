@@ -2,8 +2,9 @@ import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/server/session';
 import { hydrateCase } from '@/lib/server/case-helpers';
 import { upsertPotentialMatchesForCase } from '@/lib/server/match-helpers';
-import { ensureSameOrigin } from '@/lib/server/security';
+import { ensureSameOrigin, getClientIp, getUserAgent } from '@/lib/server/security';
 import { prisma } from '@/lib/server/db';
+import { logAuditEvent } from '@/lib/server/audit';
 
 export const runtime = 'nodejs';
 
@@ -155,6 +156,20 @@ export async function PUT(request: Request, context: { params: Promise<{ caseId:
       }
     });
 
+    // Log the update event in database audit log
+    logAuditEvent({
+      userId: user.id,
+      eventType: 'CASE_UPDATE',
+      severity: 'info',
+      target: `case:${caseId}`,
+      metadata: {
+        referenceCode: item.referenceCode,
+        statusChange: nextStatus && nextStatus !== item.status ? { from: item.status, to: nextStatus } : undefined
+      },
+      ip: getClientIp(request),
+      userAgent: getUserAgent(request)
+    });
+
     // Run auto matching
     await upsertPotentialMatchesForCase(updated);
 
@@ -206,6 +221,20 @@ export async function DELETE(request: Request, context: { params: Promise<{ case
           }
         }
       }
+    });
+
+    // Log the deletion event in database audit log
+    logAuditEvent({
+      userId: user.id,
+      eventType: 'CASE_DELETE',
+      severity: 'warn',
+      target: `case:${caseId}`,
+      metadata: {
+        referenceCode: item.referenceCode,
+        type: item.type
+      },
+      ip: getClientIp(request),
+      userAgent: getUserAgent(request)
     });
 
     // Delete matches from database

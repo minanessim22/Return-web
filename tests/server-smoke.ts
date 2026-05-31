@@ -15,7 +15,7 @@ import {
   writeRawStoreToSqlite
 } from './legacy-store-mock';
 import { getRateLimitBucketCount } from '../src/lib/server/rate-limit';
-import { getSqliteHealth, listSqliteTables, readSqliteTable } from '../src/lib/server/sqlite-db';
+import { getDatabaseHealth, listTables, readTableData } from '../src/lib/server/tracker-db';
 import type { Store } from '../src/lib/shared-types';
 
 const DELETE_DIALOG_PATH = path.join(process.cwd(), 'src', 'components', 'dashboard', 'DeleteAccountDialog.tsx');
@@ -261,9 +261,9 @@ async function main() {
     assert.doesNotMatch(adminDbPageSource, /Refresh/);
     results.push('admin database page no longer exposes the refresh action that was causing interface issues');
 
-    const tables = await listSqliteTables();
+    const tables = await listTables();
     assert.ok(tables.some((table) => table.name === 'users'));
-    const usersTable = await readSqliteTable('users', 3, 0);
+    const usersTable = await readTableData('users', 3, 0);
     assert.equal(usersTable.table, 'users');
     assert.ok(usersTable.rows.length >= 1);
     assert.ok('payload' in usersTable.rows[0]);
@@ -321,7 +321,7 @@ async function main() {
     assert.doesNotMatch(sessionSource, /\.slice\(0, 19\)/);
     results.push('session creation now caps only the current user history without dropping other active users');
 
-    const sqliteHealth = await getSqliteHealth();
+    const sqliteHealth = await getDatabaseHealth();
     assert.ok(sqliteHealth.totalRows >= 1);
     assert.ok(sqliteHealth.indexedTables.includes('users'));
     assert.match(sqliteHealth.file, /src\/data\/return\.db$/);
