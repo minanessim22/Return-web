@@ -25,4 +25,7 @@ jobs:
         run: npm audit --audit-level=high
 
       - name: Validate Prisma Schema
+        env:
+          DATABASE_URL: "postgresql://mock:mock@localhost:5432/mock"
+          DIRECT_URL: "postgresql://mock:mock@localhost:5432/mock"
         run: npx prisma validate
