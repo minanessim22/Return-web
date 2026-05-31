@@ -84,6 +84,7 @@ const MQTT_REJECT_UNAUTHORIZED =
   process.env.NODE_ENV === 'production'
     ? process.env.MQTT_REJECT_UNAUTHORIZED !== 'false'
     : false;
+
 const MQTT_MAX_PAYLOAD_SIZE_BYTES = Number(process.env.MQTT_MAX_PAYLOAD_SIZE_BYTES) || 10240; // 10KB max
 
 const DB_WRITE_THROTTLE_MS = Number(process.env.MQTT_DB_WRITE_THROTTLE_MS) || 10_000;
