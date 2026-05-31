@@ -16,6 +16,7 @@ import {
 } from './legacy-store-mock';
 import { getRateLimitBucketCount } from '../src/lib/server/rate-limit';
 import { getDatabaseHealth, listTables, readTableData } from '../src/lib/server/tracker-db';
+import { prisma } from '../src/lib/server/db';
 import type { Store } from '../src/lib/shared-types';
 
 const DELETE_DIALOG_PATH = path.join(process.cwd(), 'src', 'components', 'dashboard', 'DeleteAccountDialog.tsx');
@@ -263,11 +264,29 @@ async function main() {
 
     const tables = await listTables();
     assert.ok(tables.some((table) => table.name === 'users'));
+
+    // Ensure at least one user exists in the database for the admin viewer to query
+    const smokeAdminEmail = 'smoke.admin@example.com';
+    const existingUser = await prisma.user.findFirst({ where: { email: smokeAdminEmail } });
+    if (!existingUser) {
+      await prisma.user.create({
+        data: {
+          name: 'Smoke Admin',
+          email: smokeAdminEmail,
+          passwordHash: 'dummy-hash',
+        }
+      });
+    }
+
     const usersTable = await readTableData('users', 3, 0);
     assert.equal(usersTable.table, 'users');
     assert.ok(usersTable.rows.length >= 1);
     assert.ok('payload' in usersTable.rows[0]);
     assert.ok('payloadPreview' in usersTable.rows[0]);
+
+    // Clean up test user
+    await prisma.user.deleteMany({ where: { email: smokeAdminEmail } });
+
     results.push('SQLite admin viewer can still list tables and read rows with payload previews after the changes');
 
 
