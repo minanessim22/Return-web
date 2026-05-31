@@ -7,7 +7,8 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: Request) {
   // Enforce Vercel Cron header authorization
   const authHeader = request.headers.get('authorization');
-  if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  const cronSecret = process.env.CRON_SECRET || 'your-cron-secret-key';
+  if (authHeader !== `Bearer ${cronSecret}`) {
     return new NextResponse('Unauthorized', { status: 401 });
   }
 

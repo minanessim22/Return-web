@@ -64,10 +64,10 @@ test.describe('Authentication API & Locks E2E', () => {
     expect(body.user.email).toBe(TEST_EMAIL);
     expect(body).toHaveProperty('accessToken');
 
-    // Verify Set-Cookie header contains return-session
+    // Verify Set-Cookie header contains return_session
     const headers = response.headers();
     const setCookie = headers['set-cookie'] || '';
-    expect(setCookie).toContain('return-session');
+    expect(setCookie).toContain('return_session');
   });
 
   test('login with incorrect password returns 401 Unauthorized', async ({ request }) => {
@@ -103,7 +103,7 @@ test.describe('Authentication API & Locks E2E', () => {
 
     const headers = loginResponse.headers();
     const setCookie = headers['set-cookie'] || '';
-    const cookieMatch = setCookie.match(/return-session=([^;]+)/);
+    const cookieMatch = setCookie.match(/return_session=([^;]+)/);
     const sessionToken = cookieMatch ? cookieMatch[1] : '';
 
     // Now perform logout
@@ -111,15 +111,15 @@ test.describe('Authentication API & Locks E2E', () => {
       headers: {
         Origin: 'http://localhost:3000',
         Referer: 'http://localhost:3000/dashboard',
-        Cookie: `return-session=${sessionToken}`,
+        Cookie: `return_session=${sessionToken}`,
       },
     });
 
     expect(logoutResponse.status()).toBe(200);
 
-    // Verify logout set-cookie expires the return-session cookie
+    // Verify logout set-cookie expires the return_session cookie
     const logoutSetCookie = logoutResponse.headers()['set-cookie'] || '';
-    expect(logoutSetCookie).toContain('return-session=;');
+    expect(logoutSetCookie).toContain('return_session=;');
     expect(logoutSetCookie).toContain('Max-Age=0');
   });
 
@@ -139,13 +139,13 @@ test.describe('Authentication API & Locks E2E', () => {
 
     const headers = loginResponse.headers();
     const setCookie = headers['set-cookie'] || '';
-    const cookieMatch = setCookie.match(/return-session=([^;]+)/);
+    const cookieMatch = setCookie.match(/return_session=([^;]+)/);
     const sessionToken = cookieMatch ? cookieMatch[1] : '';
 
     // Make request to admin-only endpoint
     const adminResponse = await request.get('/api/admin/summary', {
       headers: {
-        Cookie: `return-session=${sessionToken}`,
+        Cookie: `return_session=${sessionToken}`,
       },
     });
 
