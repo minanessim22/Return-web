@@ -151,6 +151,10 @@ export async function PATCH(request: Request, context: { params: Promise<{ devic
       linkedProfileId: activeLink?.profileId || undefined,
       latitude: latestLoc?.latitude || undefined,
       longitude: latestLoc?.longitude || undefined,
+      locationHistory: [],
+      links: [],
+      notifications: [],
+      hardwareBridge: updatedDevice.hardwareBridge || {},
       createdAt: updatedDevice.createdAt.toISOString(),
       updatedAt: updatedDevice.updatedAt.toISOString()
     };

@@ -54,6 +54,24 @@ function calcDelay(attempt: number): number {
   return Math.round(exp + jitter);
 }
 
+function isValidRealtimeEvent(data: any): boolean {
+  if (!data || typeof data !== 'object') {
+    console.warn('[TrackerStream] Discarded non-object realtime payload:', data);
+    return false;
+  }
+  const deviceId = data.device_id ?? data.deviceId;
+  if (!deviceId || (typeof deviceId !== 'string' && typeof deviceId !== 'number')) {
+    console.warn('[TrackerStream] Discarded payload missing valid device_id:', data);
+    return false;
+  }
+  const strId = String(deviceId);
+  if (strId === '__proto__' || strId === 'constructor' || strId === 'prototype') {
+    console.warn('[TrackerStream] Prototype pollution attempt discarded:', data);
+    return false;
+  }
+  return true;
+}
+
 // ── Hook ──────────────────────────────────────────────────────────────────────────────────────────
 
 export function useTrackerStream() {
@@ -96,6 +114,7 @@ export function useTrackerStream() {
     es.addEventListener('location', (e) => {
       try {
         const data: TrackerEvent = JSON.parse(e.data);
+        if (!isValidRealtimeEvent(data)) return;
         setEvents((prev) => {
           const next = [data, ...prev];
           return next.length > MAX_EVENTS ? next.slice(0, MAX_EVENTS) : next;
@@ -119,6 +138,7 @@ export function useTrackerStream() {
     es.addEventListener('fall_alert', (e) => {
       try {
         const data: TrackerEvent = JSON.parse(e.data);
+        if (!isValidRealtimeEvent(data)) return;
         setFallAlerts((prev) => {
           // Avoid duplicate insertion if already added by location listener
           if (prev.some((item) => item.receivedAt === data.receivedAt)) return prev;
@@ -165,6 +185,10 @@ export function useTrackerStream() {
           (payload) => {
             try {
               const row = payload.new;
+              if (!row || typeof row !== 'object' || !row.device_id) {
+                console.warn('[TrackerStream] Discarded invalid Supabase insertion row:', row);
+                return;
+              }
               const data: TrackerEvent = {
                 device_id: String(row.device_id),
                 lat: Number(row.lat),

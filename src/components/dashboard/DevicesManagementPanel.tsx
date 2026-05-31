@@ -9,6 +9,7 @@ import type { DeviceItem, IdentificationProfile } from '@/lib/shared-types';
 import { useTrackerStream } from '@/lib/useTrackerStream';
 import { LiveTrackingMap } from '@/components/LiveTrackingMap';
 import { TrackingHistoryPanel } from '@/components/tracking/TrackingHistoryPanel';
+import { ensureArray } from '@/lib/utils';
 
 type DeviceDraft = {
   label: string;
@@ -52,10 +53,23 @@ function emptyForm(): DeviceForm {
   };
 }
 
-function toDraft(device: DeviceItem): DeviceDraft {
+function toDraft(device?: DeviceItem): DeviceDraft {
+  if (!device) {
+    return {
+      label: '',
+      status: 'INACTIVE',
+      trackingEnabled: false,
+      updateIntervalMinutes: '5',
+      linkedProfileId: '',
+      lastLocationText: '',
+      latitude: '',
+      longitude: '',
+      batteryLevel: ''
+    };
+  }
   return {
-    label: device.label,
-    status: device.status,
+    label: device.label || '',
+    status: device.status || 'INACTIVE',
     trackingEnabled: Boolean(device.trackingEnabled),
     updateIntervalMinutes: device.updateIntervalMinutes ? String(device.updateIntervalMinutes) : '5',
     linkedProfileId: device.linkedProfileId || '',
@@ -217,12 +231,17 @@ export function DevicesManagementPanel({ isRTL = false }: { isRTL?: boolean }) {
     }
     try {
       const [devicesResponse, profilesResponse] = await Promise.all([api.devices(), api.identificationProfiles()]);
-      setDevices(devicesResponse.items);
-      setProfiles(profilesResponse.items);
+      const devicesList = ensureArray(devicesResponse?.items);
+      const profilesList = ensureArray(profilesResponse?.items);
+
+      setDevices(devicesList);
+      setProfiles(profilesList);
       setDrafts((current) => {
         const next: Record<string, DeviceDraft> = {};
-        for (const device of devicesResponse.items) {
-          next[device.id] = current[device.id] || toDraft(device);
+        for (const device of devicesList) {
+          if (device && device.id) {
+            next[device.id] = current[device.id] || toDraft(device);
+          }
         }
         return next;
       });
@@ -231,7 +250,7 @@ export function DevicesManagementPanel({ isRTL = false }: { isRTL?: boolean }) {
       }
     } catch (loadError) {
       const message = loadError instanceof Error ? loadError.message : 'Unable to load devices.';
-      if (!options?.silent || devices.length === 0) {
+      if (!options?.silent || ensureArray(devices).length === 0) {
         setError(message);
       }
     } finally {
@@ -245,13 +264,13 @@ export function DevicesManagementPanel({ isRTL = false }: { isRTL?: boolean }) {
     void loadData();
   }, [loadData]);
 
-  const linkedProfilesCount = useMemo(() => devices.filter((item) => item.linkedProfileId).length, [devices]);
-  const activeDevicesCount = useMemo(() => devices.filter((item) => item.status === 'ACTIVE').length, [devices]);
-  const gpsCapableDevices = useMemo(() => devices.filter((device) => device.type === 'GPS' || device.supportsGps), [devices]);
-  const selectedHistoryDevice = useMemo(() => gpsCapableDevices.find((device) => device.serialNumber === historyDeviceId) ?? null, [gpsCapableDevices, historyDeviceId]);
+  const linkedProfilesCount = useMemo(() => ensureArray(devices).filter((item) => item?.linkedProfileId).length, [devices]);
+  const activeDevicesCount = useMemo(() => ensureArray(devices).filter((item) => item?.status === 'ACTIVE').length, [devices]);
+  const gpsCapableDevices = useMemo(() => ensureArray(devices).filter((device) => device && (device.type === 'GPS' || device.supportsGps)), [devices]);
+  const selectedHistoryDevice = useMemo(() => ensureArray(gpsCapableDevices).find((device) => device && device.serialNumber === historyDeviceId) ?? null, [gpsCapableDevices, historyDeviceId]);
 
   useEffect(() => {
-    if (historyDeviceId && !gpsCapableDevices.some((device) => device.serialNumber === historyDeviceId)) {
+    if (historyDeviceId && !ensureArray(gpsCapableDevices).some((device) => device && device.serialNumber === historyDeviceId)) {
       setHistoryDeviceId('');
     }
   }, [gpsCapableDevices, historyDeviceId]);
@@ -460,7 +479,7 @@ export function DevicesManagementPanel({ isRTL = false }: { isRTL?: boolean }) {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {[
-          { label: t.totalDevices, value: devices.length, icon: <Database className="w-5 h-5" /> },
+          { label: t.totalDevices, value: ensureArray(devices).length, icon: <Database className="w-5 h-5" /> },
           { label: t.activeDevices, value: activeDevicesCount, icon: <Radio className="w-5 h-5" /> },
           { label: t.linkedProfiles, value: linkedProfilesCount, icon: <ShieldCheck className="w-5 h-5" /> }
         ].map((card) => (
@@ -495,13 +514,13 @@ export function DevicesManagementPanel({ isRTL = false }: { isRTL?: boolean }) {
             <select
               value={historyDeviceId}
               onChange={(event) => setHistoryDeviceId(event.target.value)}
-              disabled={loading || gpsCapableDevices.length === 0}
+              disabled={loading || ensureArray(gpsCapableDevices).length === 0}
               className="w-full rounded-2xl bg-white/90 text-slate-900 px-4 py-3 outline-none disabled:opacity-60"
             >
               <option value="">{t.historySelectPlaceholder}</option>
-              {gpsCapableDevices.map((device) => (
-                <option key={device.id} value={device.serialNumber}>
-                  {device.label} · {device.serialNumber}
+              {ensureArray(gpsCapableDevices).map((device) => (
+                <option key={device?.id} value={device?.serialNumber}>
+                  {device?.label} · {device?.serialNumber}
                 </option>
               ))}
             </select>
@@ -510,7 +529,7 @@ export function DevicesManagementPanel({ isRTL = false }: { isRTL?: boolean }) {
 
         {loading ? (
           <div className="h-44 rounded-2xl border border-white/15 bg-white/10 animate-pulse" />
-        ) : gpsCapableDevices.length === 0 ? (
+        ) : ensureArray(gpsCapableDevices).length === 0 ? (
           <div className="rounded-2xl border border-white/15 bg-white/5 px-4 py-6 text-sm text-white/70">
             {t.historyNoGps}
           </div>
@@ -562,8 +581,8 @@ export function DevicesManagementPanel({ isRTL = false }: { isRTL?: boolean }) {
               <span className="text-white/70">{t.linkedProfile}</span>
               <select value={form.linkedProfileId} onChange={(event) => setForm((current) => ({ ...current, linkedProfileId: event.target.value }))} className="w-full rounded-2xl bg-white/90 text-slate-900 px-4 py-3 outline-none">
                 <option value="">{t.profilePlaceholder}</option>
-                {profiles.map((profile) => (
-                  <option key={profile.id} value={profile.id}>{profile.displayName}</option>
+                {ensureArray(profiles).map((profile) => (
+                  <option key={profile?.id} value={profile?.id}>{profile?.displayName}</option>
                 ))}
               </select>
             </label>
@@ -600,7 +619,7 @@ export function DevicesManagementPanel({ isRTL = false }: { isRTL?: boolean }) {
           <h3 className="text-xl font-black mb-2">{t.quickTools}</h3>
           <p className="text-sm text-white/70 mb-4">{t.quickToolsBody}</p>
           <div className="space-y-3">
-            {quickCards.map((card) => (
+            {ensureArray(quickCards).map((card) => (
               <button key={card.title} onClick={card.action} className="w-full rounded-3xl border border-white/15 bg-white/10 px-4 py-4 text-left hover:bg-white/20 transition">
                 <div className="flex items-center gap-3">
                   <div className="rounded-2xl bg-white/15 p-3">{card.icon}</div>
@@ -621,11 +640,11 @@ export function DevicesManagementPanel({ isRTL = false }: { isRTL?: boolean }) {
           <h3 className="text-xl font-black">{t.deviceGuideTitle}</h3>
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-          {deviceGuideSteps.map((guide) => (
+          {ensureArray(deviceGuideSteps).map((guide) => (
             <div key={`${guide.type}-${guide.title}`} className="rounded-3xl border border-white/15 bg-white/10 p-4">
               <p className="text-lg font-black">{guide.title}</p>
               <ol className="mt-3 space-y-2 text-sm text-white/80 list-decimal list-inside">
-                {guide.steps.map((step) => (
+                {ensureArray(guide?.steps).map((step) => (
                   <li key={step}>{step}</li>
                 ))}
               </ol>
@@ -639,10 +658,11 @@ export function DevicesManagementPanel({ isRTL = false }: { isRTL?: boolean }) {
           Array.from({ length: 3 }).map((_, index) => (
             <div key={index} className="h-44 rounded-3xl border border-white/15 bg-white/10 animate-pulse" />
           ))
-        ) : devices.length > 0 ? (
-          devices.map((device) => {
+        ) : ensureArray(devices).length > 0 ? (
+          ensureArray(devices).map((device) => {
+            if (!device) return null;
             const draft = drafts[device.id] || toDraft(device);
-            const profileName = profiles.find((profile) => profile.id === (draft.linkedProfileId || device.linkedProfileId))?.displayName;
+            const profileName = ensureArray(profiles).find((profile) => profile?.id === (draft.linkedProfileId || device.linkedProfileId))?.displayName;
             return (
               <div key={device.id} className="rounded-3xl border border-white/20 bg-white/10 p-5 shadow-2xl text-white">
                 <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
@@ -660,7 +680,7 @@ export function DevicesManagementPanel({ isRTL = false }: { isRTL?: boolean }) {
                   </div>
                   <div className="text-sm text-white/75 text-right space-y-1">
                     <p>{t.updated}: {formatDate(device.updatedAt)}</p>
-                    <p>{t.locationHistory}: {device.locationHistory.length}</p>
+                    <p>{t.locationHistory}: {ensureArray(device.locationHistory).length}</p>
                     <p className="text-[11px] text-white/60">{t.databaseRecord}: {device.id}</p>
                   </div>
                 </div>
@@ -673,15 +693,15 @@ export function DevicesManagementPanel({ isRTL = false }: { isRTL?: boolean }) {
                   <label className="space-y-2 text-sm">
                     <span className="text-white/70">{t.status}</span>
                     <select value={draft.status} onChange={(event) => updateDraft(device.id, { status: event.target.value as DeviceItem['status'] })} className="w-full rounded-2xl bg-white/90 text-slate-900 px-4 py-3 outline-none">
-                      {deviceStatuses.map((status) => <option key={status} value={status}>{status}</option>)}
+                      {ensureArray(deviceStatuses).map((status) => <option key={status} value={status}>{status}</option>)}
                     </select>
                   </label>
                   <label className="space-y-2 text-sm">
                     <span className="text-white/70">{t.linkedProfile}</span>
                     <select value={draft.linkedProfileId} onChange={(event) => updateDraft(device.id, { linkedProfileId: event.target.value })} className="w-full rounded-2xl bg-white/90 text-slate-900 px-4 py-3 outline-none">
                       <option value="">{t.none}</option>
-                      {profiles.map((profile) => (
-                        <option key={profile.id} value={profile.id}>{profile.displayName}</option>
+                      {ensureArray(profiles).map((profile) => (
+                        <option key={profile?.id} value={profile?.id}>{profile?.displayName}</option>
                       ))}
                     </select>
                   </label>
@@ -717,7 +737,7 @@ export function DevicesManagementPanel({ isRTL = false }: { isRTL?: boolean }) {
                     <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1">
                       {draft.trackingEnabled ? <Radio className="w-4 h-4" /> : <Power className="w-4 h-4" />} {draft.trackingEnabled ? t.trackingOn : t.trackingOff}
                     </span>
-                    {capabilityBadges(device).map((badge) => (
+                    {ensureArray(capabilityBadges(device)).map((badge) => (
                       <span key={badge} className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[11px] font-semibold">
                         {badge}
                       </span>

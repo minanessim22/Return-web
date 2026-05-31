@@ -65,6 +65,10 @@ export async function GET() {
         linkedProfileId: d.links?.[0]?.profileId || undefined,
         latitude: latestLoc?.latitude || undefined,
         longitude: latestLoc?.longitude || undefined,
+        locationHistory: [],
+        links: [],
+        notifications: [],
+        hardwareBridge: d.hardwareBridge || {},
         createdAt: d.createdAt.toISOString(),
         updatedAt: d.updatedAt.toISOString()
       };
@@ -86,6 +90,10 @@ export async function GET() {
         supportsBarcode: false,
         supportsGps: true,
         trackingEnabled: true,
+        locationHistory: [],
+        links: [],
+        notifications: [],
+        hardwareBridge: {},
         createdAt: tracker.createdAt.toISOString(),
         updatedAt: tracker.updatedAt.toISOString()
       }));
@@ -235,6 +243,10 @@ export async function POST(request: Request) {
       linkedProfileId,
       latitude,
       longitude,
+      locationHistory: [],
+      links: [],
+      notifications: [],
+      hardwareBridge: device.hardwareBridge || {},
       createdAt: device.createdAt.toISOString(),
       updatedAt: device.updatedAt.toISOString(),
       hardwareBridgeRawToken: hardwareToken || undefined // Pass back for user setup

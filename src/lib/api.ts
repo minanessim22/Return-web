@@ -6,6 +6,7 @@ import type {
   ConversationSummary,
   AdminSummaryResponse,
   DashboardSummaryResponse,
+  DeviceItem,
   IdentificationProfile,
   NotificationItem,
   PublicUser,
@@ -295,16 +296,16 @@ export const api = {
       method: 'POST'
     }),
 
-  devices: () => request<{ items: any[] }>('/api/devices'),
+  devices: () => request<{ items: DeviceItem[] }>('/api/devices'),
 
   createDevice: (payload: Record<string, unknown>) =>
-    request<{ item: any }>('/api/devices', {
+    request<{ item: DeviceItem }>('/api/devices', {
       method: 'POST',
       body: JSON.stringify(payload)
     }),
 
   updateDevice: (deviceId: string, payload: Record<string, unknown>) =>
-    request<{ item: any }>(`/api/devices/${deviceId}`, {
+    request<{ item: DeviceItem }>(`/api/devices/${deviceId}`, {
       method: 'PATCH',
       body: JSON.stringify(payload)
     }),
