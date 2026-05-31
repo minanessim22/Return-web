@@ -21,10 +21,48 @@ function wait(ms: number) {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<PublicUser | null>(null);
+  const [user, setUserState] = useState<PublicUser | null>(null);
   const [loading, setLoading] = useState(true);
   const userRef = useRef<PublicUser | null>(null);
   const refreshingRef = useRef(false);
+
+  const defaultPreference = useMemo(() => ({
+    language: 'en' as const,
+    darkMode: false,
+    notificationsEnabled: true,
+    gpsIntervalMinutes: 5,
+    showContactToFinder: true,
+    hideSensitiveDetails: true,
+    allowEmergencyLocation: true,
+    enableQr: true,
+    enableNfc: true,
+    enableGps: true,
+    enableBluetooth: true,
+    enableWifi: true,
+    matchAlerts: true,
+    foundCaseUpdates: true,
+    nearbyAlerts: false,
+    deviceAlerts: true,
+    autoDownloadQr: false,
+    ownerMessages: true,
+    locationRequests: true,
+    autoOpenProfile: false,
+    systemAnalysis: false,
+  }), []);
+
+  const setUser = useCallback((newUser: PublicUser | null) => {
+    if (newUser) {
+      setUserState({
+        ...newUser,
+        preference: {
+          ...defaultPreference,
+          ...(newUser.preference || {})
+        }
+      });
+    } else {
+      setUserState(null);
+    }
+  }, [defaultPreference]);
 
   useEffect(() => {
     userRef.current = user;
@@ -43,7 +81,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     for (let attempt = 0; attempt < 2; attempt += 1) {
       try {
         const response = await api.me();
-        setUser(response.user);
+        const mergedUser = {
+          ...response.user,
+          preference: response.settings || response.user?.preference
+        };
+        setUser(mergedUser as PublicUser);
         setLoading(false);
         refreshingRef.current = false;
         return;

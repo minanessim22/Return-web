@@ -7,6 +7,30 @@ import { prisma } from '@/lib/server/db';
 
 export const runtime = 'nodejs';
 
+const DEFAULT_PREFERENCE = {
+  language: 'en',
+  darkMode: false,
+  notificationsEnabled: true,
+  gpsIntervalMinutes: 5,
+  showContactToFinder: true,
+  hideSensitiveDetails: true,
+  allowEmergencyLocation: true,
+  enableQr: true,
+  enableNfc: true,
+  enableGps: true,
+  enableBluetooth: true,
+  enableWifi: true,
+  matchAlerts: true,
+  foundCaseUpdates: true,
+  nearbyAlerts: false,
+  deviceAlerts: true,
+  autoDownloadQr: false,
+  ownerMessages: true,
+  locationRequests: true,
+  autoOpenProfile: false,
+  systemAnalysis: false
+};
+
 export async function GET() {
   const user = await getCurrentStoredUser();
   if (!user) {
@@ -21,7 +45,13 @@ export async function GET() {
   const stats = await buildMyStats(user.id);
   const response = NextResponse.json({
     user: sanitizeUser(user),
-    settings: preference,
+    settings: preference || {
+      id: '',
+      userId: user.id,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+      ...DEFAULT_PREFERENCE
+    },
     stats
   });
 
@@ -146,7 +176,13 @@ export async function PUT(request: Request) {
     const stats = await buildMyStats(user.id);
     const response = NextResponse.json({
       user: sanitizeUser(updatedUser),
-      settings: preference,
+      settings: preference || {
+        id: '',
+        userId: user.id,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+        ...DEFAULT_PREFERENCE
+      },
       stats
     });
 

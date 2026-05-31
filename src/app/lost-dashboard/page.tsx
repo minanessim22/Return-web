@@ -784,21 +784,44 @@ function SettingsContent({ t, isRTL }: { t: typeof translations['EN']; isRTL: bo
 
   useEffect(() => {
     if (!user) return;
-    setMatchAlerts(Boolean(user.preference.matchAlerts));
-    setFoundCase(Boolean(user.preference.foundCaseUpdates));
-    setNearbyAlerts(Boolean(user.preference.nearbyAlerts));
-    setDeviceAlerts(Boolean(user.preference.deviceAlerts));
-    setEmailNotif(Boolean(user.preference.notificationsEnabled));
-    setEnableQR(Boolean(user.preference.enableQr));
-    setEnableNFC(Boolean(user.preference.enableNfc));
-    setEnableGPS(Boolean(user.preference.enableGps));
-    setEnableBluetooth(Boolean(user.preference.enableBluetooth));
-    setEnableWifi(Boolean(user.preference.enableWifi));
-    setAutoDownload(Boolean(user.preference.autoDownloadQr));
-    setShowContact(Boolean(user.preference.showContactToFinder));
-    setHideSensitive(Boolean(user.preference.hideSensitiveDetails));
-    setAllowLocation(Boolean(user.preference.allowEmergencyLocation));
-    setGpsInterval(intervalLabelFromMinutes(user.preference.gpsIntervalMinutes));
+    const pref = user.preference || {
+      language: 'en',
+      darkMode: false,
+      notificationsEnabled: true,
+      gpsIntervalMinutes: 5,
+      showContactToFinder: true,
+      hideSensitiveDetails: true,
+      allowEmergencyLocation: true,
+      enableQr: true,
+      enableNfc: true,
+      enableGps: true,
+      enableBluetooth: true,
+      enableWifi: true,
+      matchAlerts: true,
+      foundCaseUpdates: true,
+      nearbyAlerts: false,
+      deviceAlerts: true,
+      autoDownloadQr: false,
+      ownerMessages: true,
+      locationRequests: true,
+      autoOpenProfile: false,
+      systemAnalysis: false,
+    };
+    setMatchAlerts(Boolean(pref.matchAlerts));
+    setFoundCase(Boolean(pref.foundCaseUpdates));
+    setNearbyAlerts(Boolean(pref.nearbyAlerts));
+    setDeviceAlerts(Boolean(pref.deviceAlerts));
+    setEmailNotif(Boolean(pref.notificationsEnabled));
+    setEnableQR(Boolean(pref.enableQr));
+    setEnableNFC(Boolean(pref.enableNfc));
+    setEnableGPS(Boolean(pref.enableGps));
+    setEnableBluetooth(Boolean(pref.enableBluetooth));
+    setEnableWifi(Boolean(pref.enableWifi));
+    setAutoDownload(Boolean(pref.autoDownloadQr));
+    setShowContact(Boolean(pref.showContactToFinder));
+    setHideSensitive(Boolean(pref.hideSensitiveDetails));
+    setAllowLocation(Boolean(pref.allowEmergencyLocation));
+    setGpsInterval(intervalLabelFromMinutes(pref.gpsIntervalMinutes));
   }, [
     t.every10min,
     t.every30min,

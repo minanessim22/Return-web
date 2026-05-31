@@ -43,14 +43,32 @@ model User {
 }
 
 model UserPreference {
-  id                   String   @id @default(uuid()) @db.Uuid
-  userId               String   @unique @map("user_id") @db.Uuid
-  language             String   @default("en")
-  darkMode             Boolean  @default(false) @map("dark_mode")
-  notificationsEnabled Boolean  @default(true) @map("notifications_enabled")
-  createdAt            DateTime @default(now()) @map("created_at")
-  updatedAt            DateTime @updatedAt @map("updated_at")
-  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                     String   @id @default(uuid()) @db.Uuid
+  userId                 String   @unique @map("user_id") @db.Uuid
+  language               String   @default("en")
+  darkMode               Boolean  @default(false) @map("dark_mode")
+  notificationsEnabled   Boolean  @default(true) @map("notifications_enabled")
+  gpsIntervalMinutes     Int      @default(5) @map("gps_interval_minutes")
+  showContactToFinder    Boolean  @default(true) @map("show_contact_to_finder")
+  hideSensitiveDetails   Boolean  @default(true) @map("hide_sensitive_details")
+  allowEmergencyLocation Boolean  @default(true) @map("allow_emergency_location")
+  enableQr               Boolean  @default(true) @map("enable_qr")
+  enableNfc              Boolean  @default(true) @map("enable_nfc")
+  enableGps              Boolean  @default(true) @map("enable_gps")
+  enableBluetooth        Boolean  @default(true) @map("enable_bluetooth")
+  enableWifi             Boolean  @default(true) @map("enable_wifi")
+  matchAlerts            Boolean  @default(true) @map("match_alerts")
+  foundCaseUpdates       Boolean  @default(true) @map("found_case_updates")
+  nearbyAlerts           Boolean  @default(false) @map("nearby_alerts")
+  deviceAlerts           Boolean  @default(true) @map("device_alerts")
+  autoDownloadQr         Boolean  @default(false) @map("auto_download_qr")
+  ownerMessages          Boolean  @default(true) @map("owner_messages")
+  locationRequests       Boolean  @default(true) @map("location_requests")
+  autoOpenProfile        Boolean  @default(false) @map("auto_open_profile")
+  systemAnalysis         Boolean  @default(false) @map("system_analysis")
+  createdAt              DateTime @default(now()) @map("created_at")
+  updatedAt              DateTime @updatedAt @map("updated_at")
+  user                   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("user_preferences")
 }
