@@ -1,3 +1,6 @@
+-- CreateSchema
+CREATE SCHEMA IF NOT EXISTS "public";
+
 -- CreateEnum
 CREATE TYPE "UserRole" AS ENUM ('USER', 'ADMIN', 'OPERATOR');
 
@@ -60,6 +63,24 @@ CREATE TABLE "user_preferences" (
     "language" TEXT NOT NULL DEFAULT 'en',
     "dark_mode" BOOLEAN NOT NULL DEFAULT false,
     "notifications_enabled" BOOLEAN NOT NULL DEFAULT true,
+    "gps_interval_minutes" INTEGER NOT NULL DEFAULT 5,
+    "show_contact_to_finder" BOOLEAN NOT NULL DEFAULT true,
+    "hide_sensitive_details" BOOLEAN NOT NULL DEFAULT true,
+    "allow_emergency_location" BOOLEAN NOT NULL DEFAULT true,
+    "enable_qr" BOOLEAN NOT NULL DEFAULT true,
+    "enable_nfc" BOOLEAN NOT NULL DEFAULT true,
+    "enable_gps" BOOLEAN NOT NULL DEFAULT true,
+    "enable_bluetooth" BOOLEAN NOT NULL DEFAULT true,
+    "enable_wifi" BOOLEAN NOT NULL DEFAULT true,
+    "match_alerts" BOOLEAN NOT NULL DEFAULT true,
+    "found_case_updates" BOOLEAN NOT NULL DEFAULT true,
+    "nearby_alerts" BOOLEAN NOT NULL DEFAULT false,
+    "device_alerts" BOOLEAN NOT NULL DEFAULT true,
+    "auto_download_qr" BOOLEAN NOT NULL DEFAULT false,
+    "owner_messages" BOOLEAN NOT NULL DEFAULT true,
+    "location_requests" BOOLEAN NOT NULL DEFAULT true,
+    "auto_open_profile" BOOLEAN NOT NULL DEFAULT false,
+    "system_analysis" BOOLEAN NOT NULL DEFAULT false,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
 
@@ -159,6 +180,8 @@ CREATE TABLE "case_matches" (
     "source" TEXT NOT NULL DEFAULT 'ai_face_match',
     "score" DOUBLE PRECISION NOT NULL,
     "status" "MatchStatus" NOT NULL DEFAULT 'PENDING',
+    "confirmation_requested_at" TIMESTAMP(3),
+    "confirmation_requested_by_user_id" UUID,
     "confirmed_by_user_id" UUID,
     "confirmed_at" TIMESTAMP(3),
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -206,12 +229,17 @@ CREATE TABLE "devices" (
     "id" UUID NOT NULL,
     "owner_user_id" UUID,
     "type" "DeviceType" NOT NULL,
+    "hardware_model" TEXT NOT NULL DEFAULT 'STANDALONE',
+    "supports_nfc" BOOLEAN NOT NULL DEFAULT false,
+    "supports_barcode" BOOLEAN NOT NULL DEFAULT false,
+    "supports_gps" BOOLEAN NOT NULL DEFAULT false,
     "serial_number" TEXT NOT NULL,
     "label" TEXT,
     "status" "DeviceStatus" NOT NULL DEFAULT 'ACTIVE',
     "battery_level" INTEGER,
     "update_interval_minutes" INTEGER,
     "tracking_enabled" BOOLEAN NOT NULL DEFAULT false,
+    "hardware_bridge" JSONB,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
 
@@ -372,6 +400,41 @@ CREATE TABLE "key_value_store" (
     CONSTRAINT "key_value_store_pkey" PRIMARY KEY ("key")
 );
 
+-- CreateTable
+CREATE TABLE "geofences" (
+    "id" UUID NOT NULL,
+    "owner_user_id" UUID NOT NULL,
+    "device_id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "lat" DOUBLE PRECISION NOT NULL,
+    "lon" DOUBLE PRECISION NOT NULL,
+    "radius_meters" DOUBLE PRECISION NOT NULL,
+    "alert_on_enter" BOOLEAN NOT NULL DEFAULT true,
+    "alert_on_exit" BOOLEAN NOT NULL DEFAULT true,
+    "is_active" BOOLEAN NOT NULL DEFAULT true,
+    "last_state" TEXT,
+    "last_checked_at" TIMESTAMP(3),
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "geofences_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "audit_logs" (
+    "id" UUID NOT NULL,
+    "user_id" UUID,
+    "event_type" TEXT NOT NULL,
+    "severity" TEXT NOT NULL DEFAULT 'info',
+    "target" TEXT,
+    "metadata" JSONB,
+    "ip" TEXT,
+    "user_agent" TEXT,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "audit_logs_pkey" PRIMARY KEY ("id")
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "users_email_key" ON "users"("email");
 
@@ -385,6 +448,12 @@ CREATE UNIQUE INDEX "user_preferences_user_id_key" ON "user_preferences"("user_i
 CREATE INDEX "sessions_token_hash_idx" ON "sessions"("token_hash");
 
 -- CreateIndex
+CREATE INDEX "sessions_user_id_idx" ON "sessions"("user_id");
+
+-- CreateIndex
+CREATE INDEX "sessions_expires_at_idx" ON "sessions"("expires_at");
+
+-- CreateIndex
 CREATE INDEX "verification_requests_email_purpose_idx" ON "verification_requests"("email", "purpose");
 
 -- CreateIndex
@@ -395,6 +464,15 @@ CREATE INDEX "cases_owner_user_id_idx" ON "cases"("owner_user_id");
 
 -- CreateIndex
 CREATE INDEX "cases_type_status_idx" ON "cases"("type", "status");
+
+-- CreateIndex
+CREATE INDEX "case_images_case_id_idx" ON "case_images"("case_id");
+
+-- CreateIndex
+CREATE INDEX "case_status_history_case_id_idx" ON "case_status_history"("case_id");
+
+-- CreateIndex
+CREATE INDEX "case_status_history_changed_by_user_id_idx" ON "case_status_history"("changed_by_user_id");
 
 -- CreateIndex
 CREATE INDEX "case_matches_missing_case_id_idx" ON "case_matches"("missing_case_id");
@@ -412,6 +490,18 @@ CREATE UNIQUE INDEX "identification_profiles_nfc_tag_uid_key" ON "identification
 CREATE UNIQUE INDEX "devices_serial_number_key" ON "devices"("serial_number");
 
 -- CreateIndex
+CREATE INDEX "devices_owner_user_id_idx" ON "devices"("owner_user_id");
+
+-- CreateIndex
+CREATE INDEX "devices_status_idx" ON "devices"("status");
+
+-- CreateIndex
+CREATE INDEX "device_links_device_id_idx" ON "device_links"("device_id");
+
+-- CreateIndex
+CREATE INDEX "device_links_profile_id_idx" ON "device_links"("profile_id");
+
+-- CreateIndex
 CREATE INDEX "gps_locations_device_id_recorded_at_idx" ON "gps_locations"("device_id", "recorded_at");
 
 -- CreateIndex
@@ -419,6 +509,15 @@ CREATE INDEX "location_history_device_id_recorded_at_idx" ON "location_history"(
 
 -- CreateIndex
 CREATE INDEX "location_history_recorded_at_idx" ON "location_history"("recorded_at");
+
+-- CreateIndex
+CREATE INDEX "scan_events_profile_id_idx" ON "scan_events"("profile_id");
+
+-- CreateIndex
+CREATE INDEX "scan_events_device_id_idx" ON "scan_events"("device_id");
+
+-- CreateIndex
+CREATE INDEX "conversations_created_by_user_id_idx" ON "conversations"("created_by_user_id");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "conversation_participants_conversation_id_user_id_key" ON "conversation_participants"("conversation_id", "user_id");
@@ -431,6 +530,21 @@ CREATE INDEX "notifications_user_id_is_read_created_at_idx" ON "notifications"("
 
 -- CreateIndex
 CREATE INDEX "registered_trackers_owner_email_idx" ON "registered_trackers"("owner_email");
+
+-- CreateIndex
+CREATE INDEX "geofences_owner_user_id_idx" ON "geofences"("owner_user_id");
+
+-- CreateIndex
+CREATE INDEX "geofences_device_id_idx" ON "geofences"("device_id");
+
+-- CreateIndex
+CREATE INDEX "audit_logs_created_at_idx" ON "audit_logs"("created_at");
+
+-- CreateIndex
+CREATE INDEX "audit_logs_user_id_idx" ON "audit_logs"("user_id");
+
+-- CreateIndex
+CREATE INDEX "audit_logs_event_type_idx" ON "audit_logs"("event_type");
 
 -- AddForeignKey
 ALTER TABLE "user_preferences" ADD CONSTRAINT "user_preferences_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -518,3 +632,6 @@ ALTER TABLE "notifications" ADD CONSTRAINT "notifications_related_case_id_fkey" 
 
 -- AddForeignKey
 ALTER TABLE "notifications" ADD CONSTRAINT "notifications_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "geofences" ADD CONSTRAINT "geofences_owner_user_id_fkey" FOREIGN KEY ("owner_user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
