@@ -4,9 +4,12 @@
  * Pushes live GPS location events from the MQTT bridge to the
  * browser using Server-Sent Events (no Socket.io dependency).
  *
- * The frontend simply does:
- *   const es = new EventSource('/api/tracker/stream');
- *   es.addEventListener('location', (e) => { ... });
+ * Supports optional batching/coalescing to prevent SSE flooding:
+ *   GET /api/tracker/stream?batchMs=2000
+ *
+ * Implements backpressure protection by dropping non-critical updates
+ * if the subscriber's read buffer is full (desiredSize <= 0).
+ * Implements absolute cleanup guarantees on client socket abort.
  * ─────────────────────────────────────────────────────────────────
  */
 
@@ -16,12 +19,18 @@ import type { TrackerLocationEvent } from '@/lib/server/mqtt-bridge';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(request: Request) {
   // Boot the MQTT connection (idempotent)
   ensureMqttBridge();
 
+  const url = new URL(request.url);
+  // Parse batch coalescing interval
+  const batchMs = Math.max(0, Number(url.searchParams.get('batchMs')) || 0);
+
   const emitter = getMqttEmitter();
   const encoder = new TextEncoder();
+  
+  let cleanupFn: (() => void) | null = null;
 
   const stream = new ReadableStream({
     start(controller) {
@@ -35,22 +44,56 @@ export async function GET() {
         try {
           controller.enqueue(encoder.encode(`: heartbeat ${Date.now()}\n\n`));
         } catch {
-          clearInterval(heartbeat);
+          cleanup();
         }
       }, 25_000);
 
-      // Forward every MQTT location event
-      const onLocation = (event: TrackerLocationEvent) => {
+      let batchBuffer: TrackerLocationEvent[] = [];
+      let batchTimeout: NodeJS.Timeout | null = null;
+
+      const flushBatch = () => {
+        if (batchBuffer.length === 0) return;
         try {
           controller.enqueue(
-            encoder.encode(`event: location\ndata: ${JSON.stringify(event)}\n\n`)
+            encoder.encode(`event: location_batch\ndata: ${JSON.stringify(batchBuffer)}\n\n`)
           );
+          batchBuffer = [];
         } catch {
           cleanup();
         }
       };
 
+      // Forward MQTT location event
+      const onLocation = (event: TrackerLocationEvent) => {
+        // Backpressure check: if the client consumer is slow, drop regular updates
+        // to prevent stream buffer bloating and memory retention.
+        if (controller.desiredSize !== null && controller.desiredSize <= 0) {
+          if (event.alertType !== 'fall' && event.alertType !== 'sos') {
+            return; // Drop non-critical GPS telemetry under backpressure
+          }
+        }
+
+        if (batchMs > 0) {
+          batchBuffer.push(event);
+          if (!batchTimeout) {
+            batchTimeout = setTimeout(() => {
+              batchTimeout = null;
+              flushBatch();
+            }, batchMs);
+          }
+        } else {
+          try {
+            controller.enqueue(
+              encoder.encode(`event: location\ndata: ${JSON.stringify(event)}\n\n`)
+            );
+          } catch {
+            cleanup();
+          }
+        }
+      };
+
       const onFallAlert = (event: TrackerLocationEvent) => {
+        // Critical alerts always bypass backpressure dropping
         try {
           controller.enqueue(
             encoder.encode(`event: fall_alert\ndata: ${JSON.stringify(event)}\n\n`)
@@ -62,23 +105,37 @@ export async function GET() {
 
       const cleanup = () => {
         clearInterval(heartbeat);
+        if (batchTimeout) {
+          clearTimeout(batchTimeout);
+          batchTimeout = null;
+        }
         emitter.removeListener('location', onLocation);
         emitter.removeListener('fall_alert', onFallAlert);
+        try {
+          controller.close();
+        } catch {
+          // Stream might already be closed
+        }
       };
+
+      cleanupFn = cleanup;
 
       emitter.on('location', onLocation);
       emitter.on('fall_alert', onFallAlert);
-
-      // If the stream is cancelled (browser closed the tab) clean up
-      (controller as any).__cleanup = cleanup;
     },
 
     cancel() {
-      // ReadableStream cancel is called when the client disconnects
-      if ((this as any).__cleanup) {
-        (this as any).__cleanup();
+      if (cleanupFn) {
+        cleanupFn();
       }
     },
+  });
+
+  // Client abort listener cleanup guarantee (handles browser tab closes instantly)
+  request.signal.addEventListener('abort', () => {
+    if (cleanupFn) {
+      cleanupFn();
+    }
   });
 
   return new Response(stream, {
@@ -86,7 +143,7 @@ export async function GET() {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache, no-transform',
       Connection: 'keep-alive',
-      'X-Accel-Buffering': 'no', // nginx
+      'X-Accel-Buffering': 'no', // Disable buffering on Nginx reverse proxy
     },
   });
 }
