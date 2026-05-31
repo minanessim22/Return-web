@@ -284,8 +284,6 @@ async function main() {
     assert.ok('payload' in usersTable.rows[0]);
     assert.ok('payloadPreview' in usersTable.rows[0]);
 
-    // Clean up test user
-    await prisma.user.deleteMany({ where: { email: smokeAdminEmail } });
 
     results.push('SQLite admin viewer can still list tables and read rows with payload previews after the changes');
 
@@ -354,6 +352,7 @@ async function main() {
       console.log(`- ${item}`);
     }
   } finally {
+    await prisma.user.deleteMany({ where: { email: 'smoke.admin@example.com' } });
     writeRawStoreToSqlite(originalStore as unknown as Record<string, unknown>, true);
   }
 }
