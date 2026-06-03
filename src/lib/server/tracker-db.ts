@@ -312,9 +312,9 @@ export interface RegisteredTracker {
   updated_at: string;
 }
 
-export async function isTrackerRegistered(deviceId: string): Promise<boolean> {
+export async function isTrackerRegistered(serialNumber: string): Promise<boolean> {
   const row = await prisma.device.findUnique({
-    where: { serialNumber: deviceId }
+    where: { serialNumber }
   });
   return row !== null;
 }
