@@ -4,7 +4,7 @@ const cspHeader = `
   default-src 'self';
   script-src 'self' 'unsafe-eval' 'unsafe-inline';
   style-src 'self' 'unsafe-inline';
-  img-src 'self' data: blob: *.supabase.co;
+  img-src 'self' data: blob: *.supabase.co tile.openstreetmap.org *.tile.openstreetmap.org;
   font-src 'self' data:;
   connect-src 'self' *.supabase.co *.upstash.io *.ingest.sentry.io;
   frame-ancestors 'none';
