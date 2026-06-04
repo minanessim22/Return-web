@@ -27,7 +27,9 @@ import {
   AlertCircle,
   Eye,
   EyeOff,
+  RefreshCw,
 } from 'lucide-react';
+
 
 const DynamicMap = dynamic(() => import('@/components/Map'), { ssr: false });
 
@@ -409,6 +411,21 @@ export function TrackingHistoryPanel({ deviceId, deviceLabel, embedded = false }
               <EmptyState icon={Navigation} title="No trail yet" subtitle="Capture at least one GPS point to see the live location and breadcrumb trail." />
             ) : (
               <>
+                {/* Trail Map header with Refresh button */}
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-gray-400 font-semibold">
+                    {trail.length} points for {selectedDate}
+                  </p>
+                  <button
+                    onClick={() => loadTrail(selectedDate)}
+                    disabled={trailLoading}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-[#014CB3] text-white rounded-xl text-xs font-bold hover:bg-[#014CB3]/90 disabled:opacity-50 transition-all shadow-sm"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${trailLoading ? 'animate-spin' : ''}`} />
+                    Refresh Trail
+                  </button>
+                </div>
+
                 <div className="rounded-2xl overflow-hidden border border-gray-200 shadow-lg" style={{ height: '350px' }}>
                   <DynamicMap
                     center={mapCenter}
@@ -454,6 +471,7 @@ export function TrackingHistoryPanel({ deviceId, deviceLabel, embedded = false }
             )}
           </div>
         )}
+
 
         {/* ══════════════════════════════════════════════════════════
             TAB: GEOFENCES
