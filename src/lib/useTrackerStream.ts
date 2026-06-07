@@ -88,6 +88,7 @@ export function useTrackerStream() {
   const esRef = useRef<EventSource | null>(null);
   const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const attemptRef = useRef(0); // mutable mirror of reconnectAttempt for closure access
+  const mountIdRef = useRef(0); // unique channel name per mount to avoid Supabase reuse
 
   const clearRetry = () => {
     if (retryTimeoutRef.current) {
@@ -176,9 +177,9 @@ export function useTrackerStream() {
   useEffect(() => {
     if (supabase) {
       console.log('[TrackerStream] Connecting to Supabase Realtime...');
-      
+      const channelName = `location-history-changes-${++mountIdRef.current}`;
       const channel = supabase
-        .channel('location-history-changes')
+        .channel(channelName)
         .on(
           'postgres_changes',
           { event: 'INSERT', schema: 'public', table: 'location_history' },
