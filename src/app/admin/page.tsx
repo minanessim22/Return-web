@@ -47,7 +47,10 @@ export default function AdminPage() {
             <h1 className="text-3xl md:text-5xl font-black mt-2">System control panel</h1>
             <p className="text-white/75 mt-3 max-w-2xl">Review system scale, open matches, and recent reports from one place.</p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
+            <Link href="/admin/audit" className="inline-flex items-center gap-2 rounded-full border border-white/30 bg-[#014CB3] px-5 py-3 font-bold hover:bg-[#013f98] transition">
+              <Shield className="w-4 h-4" /> Audit Logs
+            </Link>
             <Link href="/admin/db" className="inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/10 px-5 py-3 font-bold hover:bg-white/20 transition">
               <Activity className="w-4 h-4" /> Open database
             </Link>
