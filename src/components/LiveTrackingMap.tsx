@@ -27,7 +27,6 @@ import React, { useEffect, useMemo, useState, useRef, memo } from 'react';
 import dynamic from 'next/dynamic';
 import { Activity, MapPin, Radio, WifiOff, Zap, Clock, Battery, Signal } from 'lucide-react';
 import { useTrackerStream } from '@/lib/useTrackerStream';
-import { bindAutoFlush } from '@/lib/offlineQueue';
 import type { MarkerPoint } from '@/components/Map';
 
 // ── Stable map wrapper (memoised – never re-mounts) ──────────────
@@ -147,9 +146,6 @@ export function LiveTrackingMap({
   const [trail, setTrail] = useState<[number, number][]>([]);
   const TRAIL_MAX = 100;
   const historyFetchedRef = useRef(false);
-
-  // Bind offline-queue auto-flush listener (idempotent)
-  useEffect(() => { bindAutoFlush(); }, []);
 
   // ── Seed initial snapshots from database on first mount ───────
   const latestFetchedRef = useRef(false);
