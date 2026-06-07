@@ -271,7 +271,7 @@ function CaseDetailsContentInner() {
 
   const dashboardBase = typeof window !== 'undefined' && localStorage.getItem('return:lastDashboard') === 'found' ? '/found-dashboard' : '/lost-dashboard';
   const matchedLocationMarkers = useMemo(() => {
-    if (!data || data.latitude === undefined || data.longitude === undefined) {
+    if (!data || typeof data.latitude !== 'number' || typeof data.longitude !== 'number') {
       return [] as Array<{ position: [number, number]; label: string }>;
     }
     return [
