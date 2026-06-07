@@ -146,37 +146,10 @@ export function LiveTrackingMap({
   // Breadcrumb trail — chronological [lat, lon] tuples (max 100 points)
   const [trail, setTrail] = useState<[number, number][]>([]);
   const TRAIL_MAX = 100;
-
-  const fetchedRef = useRef(false);
   const historyFetchedRef = useRef(false);
 
   // Bind offline-queue auto-flush listener (idempotent)
   useEffect(() => { bindAutoFlush(); }, []);
-
-  // ── Seed from REST on first mount ──────────────────────────────
-  useEffect(() => {
-    if (fetchedRef.current) return;
-    fetchedRef.current = true;
-
-    const url = deviceId
-      ? `/api/tracker/latest?device_id=${encodeURIComponent(deviceId)}`
-      : '/api/tracker/latest';
-
-    fetch(url)
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.device) {
-          setSnapshots((prev) => ({
-            ...prev,
-            [data.device.device_id]: data.device,
-          }));
-        } else if (data.devices) {
-          setSnapshots((prev) => ({ ...prev, ...data.devices }));
-        }
-      })
-      .catch(() => {/* silent – SSE will populate soon */});
-  }, [deviceId]);
-
   // ── Seed breadcrumb trail from history on first mount ──────────
   useEffect(() => {
     if (!deviceId || historyFetchedRef.current) return;
