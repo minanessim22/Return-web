@@ -74,6 +74,9 @@ function isValidRealtimeEvent(data: any): boolean {
 
 // ── Hook ──────────────────────────────────────────────────────────────────────────────────────────
 
+// Module-level counter — shared across ALL hook instances so every channel gets a unique name
+let channelCounter = 0;
+
 export function useTrackerStream() {
   const [events, setEvents] = useState<TrackerEvent[]>([]);
   const [latestByDevice, setLatestByDevice] = useState<Record<string, TrackerEvent>>({});
@@ -88,7 +91,6 @@ export function useTrackerStream() {
   const esRef = useRef<EventSource | null>(null);
   const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const attemptRef = useRef(0); // mutable mirror of reconnectAttempt for closure access
-  const mountIdRef = useRef(0); // unique channel name per mount to avoid Supabase reuse
 
   const clearRetry = () => {
     if (retryTimeoutRef.current) {
@@ -177,7 +179,7 @@ export function useTrackerStream() {
   useEffect(() => {
     if (supabase) {
       console.log('[TrackerStream] Connecting to Supabase Realtime...');
-      const channelName = `location-history-changes-${++mountIdRef.current}`;
+      const channelName = `location-history-changes-${++channelCounter}`;
       const channel = supabase
         .channel(channelName)
         .on(
