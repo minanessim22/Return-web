@@ -236,7 +236,7 @@ export function useTrackerStream() {
         });
 
       return () => {
-        void channel.unsubscribe();
+        void supabase?.removeChannel(channel);
         if (esRef.current) {
           esRef.current.close();
           esRef.current = null;
