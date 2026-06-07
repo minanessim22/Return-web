@@ -573,6 +573,52 @@ function TrailPolyline({ trail }: { trail: [number, number][] }) {
 
 // ── Map – main exported component ────────────────────────────────
 
+export type FocusPoint = {
+  position: [number, number];
+  zoom?: number;
+  popupContent?: string;
+  trigger?: number;
+};
+
+// ── MapFocusManager – handles imperative cameras flyTo and openPopup ──
+function MapFocusManager({ focusPoint }: { focusPoint?: FocusPoint }) {
+  const map = useMap();
+  const markerRef = useRef<L.Marker | null>(null);
+
+  useEffect(() => {
+    if (!focusPoint || !focusPoint.position) return;
+    const [lat, lon] = focusPoint.position;
+    if (typeof lat !== 'number' || typeof lon !== 'number' || isNaN(lat) || isNaN(lon)) return;
+
+    const targetZoom = focusPoint.zoom ?? Math.max(map.getZoom(), 16);
+    map.flyTo([lat, lon], targetZoom, { animate: true, duration: 1.2 });
+
+    const timer = setTimeout(() => {
+      if (markerRef.current) {
+        markerRef.current.openPopup();
+      }
+    }, 150);
+
+    return () => clearTimeout(timer);
+  }, [focusPoint, map]);
+
+  if (!focusPoint || !focusPoint.position) return null;
+
+  return (
+    <Marker
+      ref={markerRef}
+      position={focusPoint.position}
+      icon={markerIcon}
+    >
+      {focusPoint.popupContent ? (
+        <Popup>
+          <div dangerouslySetInnerHTML={{ __html: focusPoint.popupContent }} />
+        </Popup>
+      ) : null}
+    </Marker>
+  );
+}
+
 // ── CircleOverlay – renders geofence circles on the map ──────────
 
 export type CircleOverlay = {
@@ -592,6 +638,7 @@ function ClickHandler({ onClick }: { onClick?: (lat: number, lon: number) => voi
   });
   return null;
 }
+
 type Props = {
   center?: [number, number];
   marker?: [number, number];
@@ -621,6 +668,8 @@ type Props = {
   onMapClick?: (lat: number, lon: number) => void;
   /** Circles to render (e.g. geofence boundaries) */
   circles?: CircleOverlay[];
+  /** Dynamic focus point selected by the user */
+  focusPoint?: FocusPoint;
 };
 
 export default function Map({
@@ -635,6 +684,7 @@ export default function Map({
   trail,
   onMapClick,
   circles,
+  focusPoint,
 }: Props) {
   const [mounted, setMounted] = useState(false);
 
@@ -679,6 +729,7 @@ export default function Map({
           background: #60c10f;
           top: 7px;
           left: 7px;
+          border-radius: 50%;
         }
         .return-map-marker-live {
           background: #60c10f;
@@ -704,6 +755,7 @@ export default function Map({
         <MapResizer />
         <MapViewport center={center} markers={effectiveMarkers} zoom={zoom} />
         <MapControls showControls={showControls} deviceCenter={deviceCenter ?? (effectiveMarkers[0]?.position)} />
+        {focusPoint && <MapFocusManager focusPoint={focusPoint} />}
         {trail && trail.length >= 2 && <TrailPolyline trail={trail} />}
         {onMapClick && <ClickHandler onClick={onMapClick} />}
         {circles && circles.map((c, i) => (

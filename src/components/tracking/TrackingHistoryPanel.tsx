@@ -107,6 +107,10 @@ export function TrackingHistoryPanel({ deviceId, deviceLabel, embedded = false }
   const [trail, setTrail] = useState<TrailPoint[]>([]);
   const [trailLoading, setTrailLoading] = useState(false);
 
+  // Selected trail point for centering and highlighting
+  const [selectedPoint, setSelectedPoint] = useState<TrailPoint | null>(null);
+  const [focusTrigger, setFocusTrigger] = useState(0);
+
   // Geofences
   const [geofences, setGeofences] = useState<Geofence[]>([]);
   const [geoLoading, setGeoLoading] = useState(false);
@@ -183,12 +187,29 @@ export function TrackingHistoryPanel({ deviceId, deviceLabel, embedded = false }
     setAlertEnter(true);
     setAlertExit(true);
     setLatest(null);
+    setSelectedPoint(null);
+    setFocusTrigger(0);
   }, [deviceId]);
 
   useEffect(() => { loadStats(selectedDate); }, [selectedDate, loadStats]);
   useEffect(() => { if (activeTab === 'history') loadTrail(selectedDate); }, [activeTab, selectedDate, loadTrail]);
   useEffect(() => { if (activeTab === 'geofences') loadGeo(); }, [activeTab, loadGeo]);
   useEffect(() => { void loadLatest(); }, [loadLatest]);
+
+  // Reset selected point when switching tabs or dates to avoid outdated highlights/focuses
+  useEffect(() => {
+    setSelectedPoint(null);
+    setFocusTrigger(0);
+  }, [selectedDate, activeTab]);
+
+  const handlePointClick = useCallback((pt: TrailPoint) => {
+    if (typeof pt.lat !== 'number' || typeof pt.lon !== 'number' || isNaN(pt.lat) || isNaN(pt.lon)) {
+      notify('Invalid GPS coordinates for this point', false);
+      return;
+    }
+    setSelectedPoint(pt);
+    setFocusTrigger((prev) => prev + 1);
+  }, []);
 
   // ── Geofence CRUD ───────────────────────────────────────────────
 
@@ -426,17 +447,38 @@ export function TrackingHistoryPanel({ deviceId, deviceLabel, embedded = false }
                   </button>
                 </div>
 
-                <div className="rounded-2xl overflow-hidden border border-gray-200 shadow-lg" style={{ height: '350px' }}>
-                  <DynamicMap
-                    center={mapCenter}
-                    markers={trailMarkers}
-                    trail={trail.length >= 2 ? trailCoords : undefined}
-                    zoom={14}
-                    scrollWheelZoom={true}
-                    showControls={true}
-                    animate={false}
-                  />
-                </div>
+                {/* Construct focus point for Leaflet flyTo & Popup auto-trigger */}
+                {(() => {
+                  const focusPoint = selectedPoint ? {
+                    position: [selectedPoint.lat, selectedPoint.lon] as [number, number],
+                    zoom: 17,
+                    popupContent: `
+                      <div style="font-family: inherit; font-size: 11px; color: #1e293b; padding: 4px; line-height: 1.5; min-width: 140px;">
+                        <div style="font-weight: 800; color: #014CB3; font-size: 12px; margin-bottom: 5px;">📍 ` + deviceName + `</div>
+                        <div style="margin-bottom: 2px;"><strong>Time:</strong> ` + new Date(selectedPoint.recordedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + `</div>
+                        <div style="margin-bottom: 2px;"><strong>Lat:</strong> ` + selectedPoint.lat.toFixed(6) + `</div>
+                        <div style="margin-bottom: 2px;"><strong>Lon:</strong> ` + selectedPoint.lon.toFixed(6) + `</div>
+                        ` + (selectedPoint.battery !== undefined ? `<div style="margin-top: 4px; font-weight: bold; color: ` + (selectedPoint.battery <= 20 ? '#EF4444' : '#10B981') + `;">🔋 Battery: ` + selectedPoint.battery + `%</div>` : '') + `
+                      </div>
+                    `,
+                    trigger: focusTrigger
+                  } : undefined;
+
+                  return (
+                    <div className="rounded-2xl overflow-hidden border border-gray-200 shadow-lg" style={{ height: '350px' }}>
+                      <DynamicMap
+                        center={mapCenter}
+                        markers={trailMarkers}
+                        trail={trail.length >= 2 ? trailCoords : undefined}
+                        zoom={14}
+                        scrollWheelZoom={true}
+                        showControls={true}
+                        animate={false}
+                        focusPoint={focusPoint}
+                      />
+                    </div>
+                  );
+                })()}
 
                 {/* Trail points list */}
                 <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -446,22 +488,32 @@ export function TrackingHistoryPanel({ deviceId, deviceLabel, embedded = false }
                   </div>
                   <div className="max-h-[320px] overflow-y-auto divide-y divide-gray-50">
                     {trail.length > 0 ? (
-                      trail.slice(0, 80).map((pt, i) => (
-                        <div key={i} className="flex items-center gap-3 px-5 py-2.5 hover:bg-gray-50/50 transition-colors">
-                          <div className={`w-2 h-2 rounded-full flex-shrink-0 ${pt.alertType === 'fall' ? 'bg-red-500 animate-pulse' : 'bg-emerald-400'}`} />
-                          <span className="text-[11px] text-gray-400 font-mono flex-shrink-0 w-[70px]">
-                            {new Date(pt.recordedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                          </span>
-                          <span className="text-[11px] text-gray-500 font-mono truncate">
-                            {pt.lat.toFixed(5)}, {pt.lon.toFixed(5)}
-                          </span>
-                          {pt.battery !== undefined && (
-                            <span className={`text-[11px] font-bold ml-auto flex-shrink-0 ${pt.battery <= 20 ? 'text-red-500' : 'text-emerald-500'}`}>
-                              🔋 {pt.battery}%
+                      trail.slice(0, 80).map((pt, i) => {
+                        const isSelected = selectedPoint?.recordedAt === pt.recordedAt;
+                        return (
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={() => handlePointClick(pt)}
+                            className={`w-full text-left flex items-center gap-3 px-5 py-2.5 hover:bg-gray-50/50 transition-all cursor-pointer focus:outline-none focus:bg-gray-50/70 border-l-4 ${
+                              isSelected ? 'bg-blue-50/80 border-l-[#014CB3] pl-4 text-blue-900' : 'border-l-transparent'
+                            }`}
+                          >
+                            <div className={`w-2 h-2 rounded-full flex-shrink-0 ${pt.alertType === 'fall' ? 'bg-red-500 animate-pulse' : 'bg-emerald-400'}`} />
+                            <span className="text-[11px] text-gray-400 font-mono flex-shrink-0 w-[70px]">
+                              {new Date(pt.recordedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                             </span>
-                          )}
-                        </div>
-                      ))
+                            <span className="text-[11px] text-gray-500 font-mono truncate">
+                              {pt.lat.toFixed(5)}, {pt.lon.toFixed(5)}
+                            </span>
+                            {pt.battery !== undefined && (
+                              <span className={`text-[11px] font-bold ml-auto flex-shrink-0 ${pt.battery <= 20 ? 'text-red-500' : 'text-emerald-500'}`}>
+                                🔋 {pt.battery}%
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })
                     ) : (
                       <div className="px-5 py-4 text-xs text-gray-400">No history points yet.</div>
                     )}
