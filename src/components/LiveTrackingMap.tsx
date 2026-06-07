@@ -150,6 +150,55 @@ export function LiveTrackingMap({
 
   // Bind offline-queue auto-flush listener (idempotent)
   useEffect(() => { bindAutoFlush(); }, []);
+
+  // ── Seed initial snapshots from database on first mount ───────
+  const latestFetchedRef = useRef(false);
+  useEffect(() => {
+    if (latestFetchedRef.current) return;
+    latestFetchedRef.current = true;
+
+    const url = deviceId
+      ? `/api/tracker/latest?device_id=${encodeURIComponent(deviceId)}`
+      : '/api/tracker/latest';
+
+    fetch(url, { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((data) => {
+        if (deviceId) {
+          if (data.device) {
+            setSnapshots((prev) => ({
+              ...prev,
+              [deviceId]: {
+                device_id: deviceId,
+                lat: data.device.lat,
+                lon: data.device.lon,
+                battery: data.device.battery,
+                receivedAt: data.device.receivedAt,
+                alertType: data.device.alertType,
+              },
+            }));
+          }
+        } else if (data.devices) {
+          const incoming: Record<string, DeviceSnapshot> = {};
+          for (const [id, dev] of Object.entries(data.devices)) {
+            const d = dev as any;
+            incoming[id] = {
+              device_id: id,
+              lat: d.lat,
+              lon: d.lon,
+              battery: d.battery,
+              receivedAt: d.receivedAt,
+              alertType: d.alertType,
+            };
+          }
+          if (Object.keys(incoming).length > 0) {
+            setSnapshots((prev) => ({ ...prev, ...incoming }));
+          }
+        }
+      })
+      .catch((err) => console.error('[LiveTrackingMap] Failed to seed latest locations:', err));
+  }, [deviceId]);
+
   // ── Seed breadcrumb trail from history on first mount ──────────
   useEffect(() => {
     if (!deviceId || historyFetchedRef.current) return;

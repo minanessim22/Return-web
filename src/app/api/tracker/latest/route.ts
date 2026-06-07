@@ -78,6 +78,40 @@ async function getLatestFromDb(deviceId: string): Promise<LatestEntry | null> {
   }
 }
 
+/** Fetch the latest location history records for all devices in DB */
+async function getAllLatestFromDb(): Promise<Record<string, LatestEntry>> {
+  const devices: Record<string, LatestEntry> = {};
+  try {
+    // 1. Get all registered device serial numbers
+    const dbDevices = await prisma.device.findMany({
+      select: { serialNumber: true }
+    });
+    
+    // 2. Also get any other device IDs from location_history to be safe
+    const locationDevices = await prisma.locationHistory.groupBy({
+      by: ['deviceId']
+    });
+    
+    const allDeviceIds = new Set([
+      ...dbDevices.map(d => d.serialNumber).filter(Boolean),
+      ...locationDevices.map(l => l.deviceId).filter(Boolean)
+    ]);
+    
+    // 3. For each device ID, fetch the latest history record
+    await Promise.all(
+      Array.from(allDeviceIds).map(async (deviceId) => {
+        const entry = await getLatestFromDb(deviceId);
+        if (entry) {
+          devices[deviceId] = entry;
+        }
+      })
+    );
+  } catch (err) {
+    console.error('Error fetching all latest from DB:', err);
+  }
+  return devices;
+}
+
 export async function GET(request: Request) {
   ensureMqttBridge();
 
@@ -97,8 +131,11 @@ export async function GET(request: Request) {
     });
   }
 
-  // Return all known devices from cache
-  const devices: Record<string, LatestEntry> = {};
+  // 1. Seed with latest DB records
+  const dbLatest = await getAllLatestFromDb();
+  const devices: Record<string, LatestEntry> = { ...dbLatest };
+
+  // 2. Merge cache on top of database records
   for (const [id, entry] of cache.entries()) {
     devices[id] = entry;
   }
@@ -106,7 +143,7 @@ export async function GET(request: Request) {
   return Response.json(
     {
       devices,
-      count: cache.size,
+      count: Object.keys(devices).length,
       updatedAt: new Date().toISOString(),
     },
     { headers: { 'Cache-Control': 'no-store' } }
