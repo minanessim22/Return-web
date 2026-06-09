@@ -262,7 +262,7 @@ export function buildComparisonSignals(left: ScorableCase, right: ScorableCase):
       metadataScore += 0.05;
       reasons.push('close age');
     } else if (ageGap >= 8) {
-      metadataScore -= 0.12;
+      metadataScore -= 0.18;
     }
   }
 
@@ -353,7 +353,8 @@ export function finalizeHybridMatchResult(
 
   if (signals.leftFamily === 'person' && signals.rightFamily === 'person') {
     if (signals.hardMetadataConflict) {
-      weightedScore = Math.min(weightedScore, aiPriorityApplied && (roundedImageScore || 0) >= 0.95 ? 0.72 : 0.62);
+      // Severely cap score when gender or age conflicts exist — even strong face match can't fully override
+      weightedScore = Math.min(weightedScore, aiPriorityApplied && (roundedImageScore || 0) >= 0.95 ? 0.55 : 0.45);
     }
 
     if (!aiPriorityApplied && signals.supportingSignals < 2) {

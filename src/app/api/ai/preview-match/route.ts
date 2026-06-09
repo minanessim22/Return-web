@@ -104,32 +104,60 @@ export async function POST(request: Request) {
     }
   }
 
-  // Query eligible active candidates of the opposite type from PostgreSQL via Prisma (equivalent to isCaseEligibleForAutoMatching)
-  const candidates = await prisma.caseItem.findMany({
-    where: {
-      deletedAt: null,
-      status: { in: ['ACTIVE', 'UNDER_REVIEW', 'MATCHED'] },
-      type: caseType === 'MISSING' ? 'FOUND' : 'MISSING',
-      // Exclude candidates with a confirmed match
-      NOT: {
-        OR: [
-          {
-            missingMatches: {
-              some: {
-                status: 'CONFIRMED'
-              }
-            }
-          },
-          {
-            foundMatches: {
-              some: {
-                status: 'CONFIRMED'
-              }
+  // Query eligible active candidates of the opposite type from PostgreSQL via Prisma
+  // Pre-filter by gender and age to avoid scoring obviously incompatible candidates
+  const previewGender = previewCase.gender?.trim();
+  const previewAge = previewCase.age;
+  const previewCategory = (previewCase.category || 'child').trim().toLowerCase();
+  const isPersonPreview = ['child', 'elderly', 'adult male', 'adult female', 'person', 'people', 'man', 'woman'].includes(previewCategory);
+
+  const candidateWhere: any = {
+    deletedAt: null,
+    status: { in: ['ACTIVE', 'UNDER_REVIEW', 'MATCHED'] },
+    type: caseType === 'MISSING' ? 'FOUND' : 'MISSING',
+    // Exclude candidates with a confirmed match
+    NOT: {
+      OR: [
+        {
+          missingMatches: {
+            some: {
+              status: 'CONFIRMED'
             }
           }
+        },
+        {
+          foundMatches: {
+            some: {
+              status: 'CONFIRMED'
+            }
+          }
+        }
+      ]
+    }
+  };
+
+  // Hard filter: same gender for person cases (allow null through for scoring)
+  if (isPersonPreview && previewGender) {
+    candidateWhere.OR = [
+      { gender: { equals: previewGender, mode: 'insensitive' } },
+      { gender: null }
+    ];
+  }
+
+  // Hard filter: age within ±15 years for person cases (wider range for AI matching)
+  if (isPersonPreview && previewAge !== null && previewAge !== undefined) {
+    candidateWhere.AND = [
+      {
+        OR: [
+          { age: { gte: previewAge - 15, lte: previewAge + 15 } },
+          { age: null }
         ]
       }
-    },
+    ];
+  }
+
+  const candidates = await prisma.caseItem.findMany({
+    where: candidateWhere,
     include: {
       images: true,
       owner: true
