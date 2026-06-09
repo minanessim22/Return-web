@@ -311,7 +311,7 @@ export function buildComparisonSignals(left: ScorableCase, right: ScorableCase):
     metadataStrength,
     supportingSignals,
     reasons,
-    metadataScore: Math.max(0, Math.min(Number(metadataScore.toFixed(4)), 0.98))
+    metadataScore: Math.max(0, Math.min(Number(metadataScore.toFixed(4)), 1.0))
   };
 }
 
@@ -337,7 +337,9 @@ export function finalizeHybridMatchResult(
   }
 
   if (aiPriorityApplied && roundedImageScore !== undefined) {
-    weightedScore += roundedImageScore * 0.18;
+    // Apply 75% text score / 25% image score weighted average
+    weightedScore = (weightedScore * 0.75) + (roundedImageScore * 0.25);
+    
     if (roundedImageScore >= 0.92) {
       reasons.push('the image helper found a very strong face similarity');
     } else if (roundedImageScore >= ACCEPTED_MATCH_THRESHOLD) {
@@ -367,26 +369,6 @@ export function finalizeHybridMatchResult(
       } else if (roundedImageScore < MANUAL_REVIEW_THRESHOLD && signals.supportingSignals < 4) {
         weightedScore = Math.min(weightedScore, 0.74);
       }
-
-      if (!signals.hardMetadataConflict && (signals.exactCategory || signals.sameFamily)) {
-        if (roundedImageScore >= 0.94 && signals.supportingSignals >= 3) {
-          weightedScore = Math.max(weightedScore, 0.84);
-        } else if (roundedImageScore >= ACCEPTED_MATCH_THRESHOLD && signals.supportingSignals >= 3) {
-          weightedScore = Math.max(weightedScore, 0.76);
-        } else if (roundedImageScore >= MANUAL_REVIEW_THRESHOLD && signals.supportingSignals >= 2) {
-          weightedScore = Math.max(weightedScore, 0.68);
-        }
-      }
-
-      if (roundedImageScore >= 0.92 && signals.supportingSignals < 3) {
-        weightedScore = Math.min(Math.max(weightedScore, 0.74), 0.79);
-      }
-    }
-  } else if (aiPriorityApplied && roundedImageScore !== undefined && (signals.exactCategory || signals.sameFamily)) {
-    if (roundedImageScore >= 0.9) {
-      weightedScore = Math.max(weightedScore, 0.78);
-    } else if (roundedImageScore >= MANUAL_REVIEW_THRESHOLD) {
-      weightedScore = Math.max(weightedScore, 0.68);
     }
   }
 
@@ -402,7 +384,7 @@ export function finalizeHybridMatchResult(
       : 'strong metadata alignment kept this match visible');
   }
 
-  const finalScore = Math.max(0, Math.min(Number(weightedScore.toFixed(2)), 0.98));
+  const finalScore = Math.max(0, Math.min(Number(weightedScore.toFixed(2)), 1.0));
   const decisionInfo = getMatchDecision(finalScore);
   const reasonPrefix = aiPriorityApplied && roundedImageScore !== undefined
     ? `${options.aiAssistLabel || 'Data-first matching used the photo as a helper'} (${Math.round(roundedImageScore * 100)}% image similarity)`

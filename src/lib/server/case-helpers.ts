@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/server/db';
+import { dateToIso } from '@/lib/server/security';
 
 export async function getHydratedMatches(caseId: string) {
   const matches = await prisma.caseMatch.findMany({
@@ -55,7 +56,7 @@ export async function getHydratedMatches(caseId: string) {
         phone: otherCase.owner.phone
       } : undefined,
       conversationId: conversation?.id || undefined,
-      createdAt: item.createdAt.toISOString()
+      createdAt: dateToIso(item.createdAt) || new Date().toISOString()
     });
   }
 
@@ -85,12 +86,12 @@ export async function hydrateCase(item: any, includeMatches = false) {
     locationText: item.locationText,
     latitude: item.latitude,
     longitude: item.longitude,
-    eventTime: item.eventTime ? item.eventTime.toISOString() : undefined,
-    lastSeenAt: item.lastSeenAt ? item.lastSeenAt.toISOString() : undefined,
-    foundAt: item.foundAt ? item.foundAt.toISOString() : undefined,
-    resolvedAt: item.resolvedAt ? item.resolvedAt.toISOString() : undefined,
-    createdAt: item.createdAt.toISOString(),
-    updatedAt: item.updatedAt.toISOString(),
+    eventTime: dateToIso(item.eventTime),
+    lastSeenAt: dateToIso(item.lastSeenAt),
+    foundAt: dateToIso(item.foundAt),
+    resolvedAt: dateToIso(item.resolvedAt),
+    createdAt: dateToIso(item.createdAt) || new Date().toISOString(),
+    updatedAt: dateToIso(item.updatedAt) || new Date().toISOString(),
     primaryImage: item.images?.[0]?.imageUrl || undefined,
     images: item.images?.map((img: any) => ({ id: img.id, imageUrl: img.imageUrl })) || [],
     owner: owner ? {

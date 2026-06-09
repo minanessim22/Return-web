@@ -95,7 +95,7 @@ export function generateNumericCode(length = 6) {
 
 export function dateToIso(value: unknown) {
   if (!value) return undefined;
-  const date = new Date(String(value));
+  const date = value instanceof Date ? value : new Date(String(value));
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
 }
 
