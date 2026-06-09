@@ -104,7 +104,7 @@ export async function POST(request: Request) {
     }
   }
 
-  // Query eligible active candidates of the opposite type from PostgreSQL via Prisma
+  // Query eligible active candidates of the opposite type from PostgreSQL via Prisma (equivalent to isCaseEligibleForAutoMatching)
   // Pre-filter by gender and age to avoid scoring obviously incompatible candidates
   const previewGender = previewCase.gender?.trim();
   const previewAge = previewCase.age;
