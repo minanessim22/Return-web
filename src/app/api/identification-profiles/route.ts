@@ -41,6 +41,7 @@ export async function GET() {
         clothesColor: p.clothesColor,
         bloodType: p.bloodType,
         medicalNotes: p.medicalNotes,
+        notes: p.notes,
         lastLocationText: p.lastLocationText,
         latitude: p.latitude,
         longitude: p.longitude,
@@ -92,7 +93,8 @@ export async function POST(request: Request) {
   const category = parseOptionalString(body.category ?? body.type);
   const clothesColor = parseOptionalString(body.clothesColor);
   const bloodType = parseOptionalString(body.bloodType);
-  const medicalNotes = parseOptionalString(body.medicalNotes ?? body.notes);
+  const medicalNotes = parseOptionalString(body.medicalNotes);
+  const notes = parseOptionalString(body.notes);
   const lastLocationText = parseOptionalString(body.lastLocationText ?? body.location);
   const latitude = parseOptionalNumber(body.latitude);
   const longitude = parseOptionalNumber(body.longitude);
@@ -125,6 +127,7 @@ export async function POST(request: Request) {
         clothesColor,
         bloodType,
         medicalNotes,
+        notes,
         lastLocationText,
         latitude,
         longitude,
@@ -244,6 +247,7 @@ export async function POST(request: Request) {
       clothesColor: finalProfile.clothesColor,
       bloodType: finalProfile.bloodType,
       medicalNotes: finalProfile.medicalNotes,
+      notes: finalProfile.notes,
       lastLocationText: finalProfile.lastLocationText,
       latitude: finalProfile.latitude,
       longitude: finalProfile.longitude,

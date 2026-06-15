@@ -205,6 +205,7 @@ model IdentificationProfile {
   clothesColor      String?                          @map("clothes_color")
   bloodType         String?                          @map("blood_type")
   medicalNotes      String?                          @map("medical_notes")
+  notes             String?
   lastLocationText  String?                          @map("last_location_text")
   latitude          Float?
   longitude         Float?
@@ -216,6 +217,7 @@ model IdentificationProfile {
   updatedAt         DateTime                         @updatedAt @map("updated_at")
   deviceLinks       DeviceLink[]
   emergencyContacts IdentificationEmergencyContact[]
+  foundReports      FoundReport[]
   owner             User?                            @relation("ProfileOwner", fields: [ownerUserId], references: [id])
   scanEvents        ScanEvent[]
 
@@ -332,6 +334,21 @@ model ScanEvent {
   @@index([profileId])
   @@index([deviceId])
   @@map("scan_events")
+}
+
+model FoundReport {
+  id                 String                @id @default(uuid()) @db.Uuid
+  profileId          String                @map("profile_id") @db.Uuid
+  scanEventId        String?               @map("scan_event_id") @db.Uuid
+  finderLatitude     Float?                @map("finder_latitude")
+  finderLongitude    Float?                @map("finder_longitude")
+  finderLocationText String?               @map("finder_location_text")
+  notifiedOwner      Boolean               @default(false) @map("notified_owner")
+  createdAt          DateTime              @default(now()) @map("created_at")
+  profile            IdentificationProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@index([profileId])
+  @@map("found_reports")
 }
 
 model AiJob {

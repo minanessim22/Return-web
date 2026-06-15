@@ -19,3 +19,6 @@ src/data/return.db-wal
 
 # Prisma
 tsconfig.tsbuildinfo
+
+# Worktrees
+.worktrees/
