@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { BatteryMedium, Database, MapPin, Plus, Power, QrCode, Radio, RefreshCw, Save, ShieldCheck, SmartphoneCharging, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
+import { supabase } from '@/lib/supabaseClient';
 import { getHardwareModelLabel } from '@/lib/device-models';
 import type { DeviceItem, IdentificationProfile } from '@/lib/shared-types';
 import { useTrackerStream } from '@/lib/useTrackerStream';
@@ -131,6 +132,7 @@ export function DevicesManagementPanel({ isRTL = false }: { isRTL?: boolean }) {
           openQr: 'إنشاء QR',
           openNfc: 'ربط NFC',
           openGps: 'صفحة GPS',
+          googleMaps: 'خرائط جوجل',
           totalDevices: 'إجمالي الأجهزة',
           activeDevices: 'أجهزة نشطة',
           linkedProfiles: 'ملفات مرتبطة',
@@ -187,6 +189,7 @@ export function DevicesManagementPanel({ isRTL = false }: { isRTL?: boolean }) {
           openQr: 'Generate QR',
           openNfc: 'Link NFC',
           openGps: 'Open GPS page',
+          googleMaps: 'Google Maps',
           totalDevices: 'Total devices',
           activeDevices: 'Active devices',
           linkedProfiles: 'Linked profiles',
@@ -274,6 +277,77 @@ export function DevicesManagementPanel({ isRTL = false }: { isRTL?: boolean }) {
       setHistoryDeviceId('');
     }
   }, [gpsCapableDevices, historyDeviceId]);
+
+  useEffect(() => {
+    if (!supabase) {
+      console.warn('[DevicesRealtime] Supabase client is not configured.');
+      return;
+    }
+
+    console.log('[DevicesRealtime] Subscribing to found_reports inserts...');
+    const channel = supabase
+      .channel('devices-found-reports')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'found_reports' },
+        (payload) => {
+          try {
+            console.log('[DevicesRealtime] Received new found_report:', payload.new);
+            const newReport = payload.new;
+            if (!newReport || !newReport.profile_id) return;
+
+            const profileId = String(newReport.profile_id);
+            const lat = newReport.finder_latitude !== null && newReport.finder_latitude !== undefined ? Number(newReport.finder_latitude) : null;
+            const lng = newReport.finder_longitude !== null && newReport.finder_longitude !== undefined ? Number(newReport.finder_longitude) : null;
+            const locationText = newReport.finder_location_text || (lat !== null && lng !== null ? `Scan Location (${lat.toFixed(4)}, ${lng.toFixed(4)})` : 'Tag scanned');
+
+            // Update local state dynamically without reloading
+            setDevices((currentDevices) => {
+              return currentDevices.map((device) => {
+                // Instantly matches if either device.id === profile_id or device.linkedProfileId === profile_id
+                if (device.id === profileId || device.linkedProfileId === profileId) {
+                  return {
+                    ...device,
+                    latitude: lat !== null ? lat : undefined,
+                    longitude: lng !== null ? lng : undefined,
+                    lastLocationText: locationText
+                  };
+                }
+                return device;
+              });
+            });
+
+            // Also update the draft values so the text fields show the new values immediately
+            setDrafts((currentDrafts) => {
+              const updatedDrafts = { ...currentDrafts };
+              // We find the matching device(s) and update their draft states
+              setDevices((currentDevices) => {
+                currentDevices.forEach((device) => {
+                  if (device.id === profileId || device.linkedProfileId === profileId) {
+                    updatedDrafts[device.id] = {
+                      ...(updatedDrafts[device.id] || toDraft(device)),
+                      latitude: lat !== null ? String(lat) : '',
+                      longitude: lng !== null ? String(lng) : '',
+                      lastLocationText: locationText
+                    };
+                  }
+                });
+                return currentDevices;
+              });
+              return updatedDrafts;
+            });
+
+          } catch (err) {
+            console.error('[DevicesRealtime] Error processing realtime found_report payload:', err);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      void supabase?.removeChannel(channel);
+    };
+  }, []);
 
 
 
@@ -663,6 +737,12 @@ export function DevicesManagementPanel({ isRTL = false }: { isRTL?: boolean }) {
             if (!device) return null;
             const draft = drafts[device.id] || toDraft(device);
             const profileName = ensureArray(profiles).find((profile) => profile?.id === (draft.linkedProfileId || device.linkedProfileId))?.displayName;
+
+            // Safe coordinate calculation for Google Maps deep-linking
+            const latVal = draft.latitude ? Number(draft.latitude) : (device.latitude !== undefined && device.latitude !== null ? Number(device.latitude) : null);
+            const lngVal = draft.longitude ? Number(draft.longitude) : (device.longitude !== undefined && device.longitude !== null ? Number(device.longitude) : null);
+            const hasCoordinates = latVal !== null && lngVal !== null && !isNaN(latVal) && !isNaN(lngVal);
+
             return (
               <div key={device.id} className="rounded-3xl border border-white/20 bg-white/10 p-5 shadow-2xl text-white">
                 <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
@@ -757,6 +837,21 @@ export function DevicesManagementPanel({ isRTL = false }: { isRTL?: boolean }) {
                     <button onClick={() => void handleSaveDevice(device.id, { status: 'INACTIVE', trackingEnabled: false })} disabled={savingId === device.id} className="rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-bold hover:bg-white/20 transition disabled:opacity-60">
                       {t.turnOff}
                     </button>
+                    {hasCoordinates ? (
+                      <button
+                        onClick={() => window.open(`https://www.google.com/maps?q=${latVal},${lngVal}`, '_blank')}
+                        className="border-amber-500/50 bg-amber-500/20 text-amber-300 hover:bg-amber-500/40 cursor-pointer animate-pulse rounded-full border px-4 py-2 text-sm font-bold transition-all active:scale-[0.97] shadow-md"
+                      >
+                        📍 {t.googleMaps}
+                      </button>
+                    ) : (
+                      <button
+                        disabled
+                        className="border-white/10 bg-white/5 text-white/40 cursor-not-allowed shadow-none rounded-full border px-4 py-2 text-sm font-bold transition-all"
+                      >
+                        📍 {t.googleMaps}
+                      </button>
+                    )}
                     {device.type === 'GPS' ? (
                       <button onClick={() => void handleSaveDevice(device.id, { status: draft.status === 'ACTIVE' ? 'PAUSED' : 'ACTIVE' })} disabled={savingId === device.id} className="rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-bold hover:bg-white/20 transition disabled:opacity-60">
                         {draft.status === 'ACTIVE' ? t.pause : t.activate}
