@@ -167,10 +167,10 @@ export default function PublicIdentifyPage({ params }: { params: Promise<{ token
     if (!primaryContact) return '';
     if (isPerson) {
       return primaryContact.relation
-        ? `اتصال بـ ${primaryContact.relation} الآن`
-        : `اتصال بـ ${primaryContact.contactName} الآن`;
+        ? `Call ${primaryContact.relation} Now`
+        : `Call ${primaryContact.contactName} Now`;
     }
-    return `اتصال بـ صاحب ${item?.displayName || 'الشيء'} الآن`;
+    return `Call ${item?.displayName || 'Item'} Owner Now`;
   }, [isPerson, primaryContact, item?.displayName]);
 
   const coordinates = useMemo(() => {
@@ -182,10 +182,10 @@ export default function PublicIdentifyPage({ params }: { params: Promise<{ token
   const GpsStatusBadge = () => {
     if (gpsStatus === 'idle') return null;
     const configs: Record<Exclude<GpsStatus, 'idle'>, { icon: React.ReactNode; text: string; className: string }> = {
-      requesting: { icon: <Loader2 className="h-3.5 w-3.5 animate-spin" />, text: 'جاري تحديد الموقع...', className: 'bg-amber-500/20 text-amber-200 border-amber-400/30' },
-      success: { icon: <CheckCircle2 className="h-3.5 w-3.5" />, text: 'تم إرسال الموقع للمالك', className: 'bg-emerald-500/20 text-emerald-200 border-emerald-400/30' },
-      denied: { icon: <AlertTriangle className="h-3.5 w-3.5" />, text: 'تم إبلاغ المالك (بدون موقع)', className: 'bg-orange-500/20 text-orange-200 border-orange-400/30' },
-      error: { icon: <AlertTriangle className="h-3.5 w-3.5" />, text: 'تم إبلاغ المالك', className: 'bg-orange-500/20 text-orange-200 border-orange-400/30' }
+      requesting: { icon: <Loader2 className="h-3.5 w-3.5 animate-spin" />, text: 'Locating...', className: 'bg-amber-500/20 text-amber-200 border-amber-400/30' },
+      success: { icon: <CheckCircle2 className="h-3.5 w-3.5" />, text: 'Location sent to owner', className: 'bg-emerald-500/20 text-emerald-200 border-emerald-400/30' },
+      denied: { icon: <AlertTriangle className="h-3.5 w-3.5" />, text: 'Owner notified (no location)', className: 'bg-orange-500/20 text-orange-200 border-orange-400/30' },
+      error: { icon: <AlertTriangle className="h-3.5 w-3.5" />, text: 'Owner notified', className: 'bg-orange-500/20 text-orange-200 border-orange-400/30' }
     };
     const config = configs[gpsStatus];
     return (
@@ -205,7 +205,7 @@ export default function PublicIdentifyPage({ params }: { params: Promise<{ token
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <div className="rounded-full border border-white/25 bg-white/15 px-4 py-2 text-sm font-semibold backdrop-blur">
             <ShieldCheck className="mr-2 inline-block h-4 w-4" />
-            صفحة تعريف آمنة — RETURN
+            Secure Identification — RETURN
           </div>
           <GpsStatusBadge />
         </div>
@@ -217,10 +217,10 @@ export default function PublicIdentifyPage({ params }: { params: Promise<{ token
           </div>
         ) : error ? (
           <div className="rounded-[2rem] border border-white/20 bg-white/10 px-6 py-10 text-center shadow-2xl backdrop-blur">
-            <h1 className="text-3xl font-black">الصفحة غير متاحة</h1>
+            <h1 className="text-3xl font-black">Page Unavailable</h1>
             <p className="mt-4 text-white/80">{error}</p>
             <Link href="/" className="mt-6 inline-flex rounded-full border border-white/25 bg-white/15 px-5 py-3 font-bold hover:bg-white/20">
-              العودة للرئيسية
+              Back to Home
             </Link>
           </div>
         ) : item ? (
@@ -247,7 +247,7 @@ export default function PublicIdentifyPage({ params }: { params: Promise<{ token
 
               <div className="p-5 sm:p-6">
                 <p className="text-xs font-black uppercase tracking-[0.22em] text-white/60">
-                  {isPerson ? 'بيانات التعريف' : 'بيانات الشيء'}
+                  {isPerson ? 'Identification Details' : 'Item Details'}
                 </p>
                 <h1 className="mt-2 text-3xl font-black sm:text-4xl">{item.displayName}</h1>
 
@@ -255,16 +255,16 @@ export default function PublicIdentifyPage({ params }: { params: Promise<{ token
                 {isPerson && (
                   <div className="mt-4 flex flex-wrap gap-3">
                     <span className="rounded-full border border-white/20 bg-white/10 px-4 py-1.5 text-sm font-bold">
-                      {item.category || 'شخص'}
+                      {item.category || 'Person'}
                     </span>
                     {item.age !== undefined && (
                       <span className="rounded-full border border-white/20 bg-white/10 px-4 py-1.5 text-sm font-bold">
-                        {item.age} سنة
+                        {item.age} yrs
                       </span>
                     )}
                     {item.bloodType && (
                       <span className="rounded-full border border-red-400/30 bg-red-500/15 px-4 py-1.5 text-sm font-bold text-red-200">
-                        فصيلة الدم: {item.bloodType}
+                        Blood Type: {item.bloodType}
                       </span>
                     )}
                   </div>
@@ -282,7 +282,7 @@ export default function PublicIdentifyPage({ params }: { params: Promise<{ token
               <section className="rounded-[2rem] border border-amber-400/30 bg-amber-500/10 p-5 shadow-2xl backdrop-blur sm:p-6">
                 <div className="flex items-center gap-3">
                   <Stethoscope className="h-6 w-6 text-amber-300" />
-                  <h2 className="text-xl font-black text-amber-100">ملاحظات طبية مهمة</h2>
+                  <h2 className="text-xl font-black text-amber-100">Important Medical Notes</h2>
                 </div>
                 <p className="mt-4 text-base leading-8 text-amber-50/90">
                   {item.medicalNotes}
@@ -295,11 +295,11 @@ export default function PublicIdentifyPage({ params }: { params: Promise<{ token
               <section className="rounded-[2rem] border border-emerald-400/30 bg-emerald-500/10 p-5 shadow-2xl backdrop-blur sm:p-6">
                 <div className="flex items-center gap-3">
                   <Heart className="h-6 w-6 text-emerald-300" />
-                  <h2 className="text-xl font-black text-emerald-100">شكراً لأمانتك</h2>
+                  <h2 className="text-xl font-black text-emerald-100">Thank You for Your Honesty</h2>
                 </div>
                 <p className="mt-4 text-base leading-8 text-emerald-50/90">
-                  تم إرسال موقع {item.displayName} لصاحبها بنجاح وجاري قدومه لاستلامها.
-                  يمكنك الاتصال مباشرة بالزر أدناه إذا أردت تسليمها يداً بيد.
+                  The location of {item.displayName} has been sent to the owner successfully.
+                  You can call directly using the button below to arrange a hand-off.
                 </p>
               </section>
             )}
@@ -307,7 +307,7 @@ export default function PublicIdentifyPage({ params }: { params: Promise<{ token
             {/* ── Emergency Contact Card ── */}
             {primaryContact && (
               <section className="rounded-[2rem] border border-white/20 bg-white/10 p-5 shadow-2xl backdrop-blur sm:p-6">
-                <p className="text-xs font-black uppercase tracking-[0.18em] text-white/60">جهة اتصال الطوارئ</p>
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-white/60">Emergency Contact</p>
                 <p className="mt-3 text-2xl font-black">{primaryContact.contactName}</p>
                 {primaryContact.relation && (
                   <p className="mt-1 text-white/70">({primaryContact.relation})</p>
@@ -330,7 +330,7 @@ export default function PublicIdentifyPage({ params }: { params: Promise<{ token
                       rel="noreferrer"
                       className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/10 px-5 py-3 font-bold hover:bg-white/20"
                     >
-                      <Navigation className="h-4 w-4" /> الاتجاهات
+                      <Navigation className="h-4 w-4" /> Directions
                     </a>
                   )}
                 </div>
@@ -340,7 +340,7 @@ export default function PublicIdentifyPage({ params }: { params: Promise<{ token
             {/* ── Extra Notes ── */}
             {item.notes && (
               <section className="rounded-[2rem] border border-white/20 bg-white/10 p-5 shadow-2xl backdrop-blur sm:p-6">
-                <p className="text-xs font-black uppercase tracking-[0.18em] text-white/60">ملاحظات إضافية</p>
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-white/60">Additional Notes</p>
                 <p className="mt-3 whitespace-pre-line text-sm leading-7 text-white/90">{item.notes}</p>
               </section>
             )}
@@ -351,14 +351,14 @@ export default function PublicIdentifyPage({ params }: { params: Promise<{ token
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-5 py-4 sm:px-6">
                   <div className="flex items-center gap-3">
                     <MapPin className="h-5 w-5" />
-                    <h2 className="text-lg font-black">آخر موقع معروف</h2>
+                    <h2 className="text-lg font-black">Last Known Location</h2>
                   </div>
                   <button
                     type="button"
                     onClick={() => setShowMap((v) => !v)}
                     className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/10 px-4 py-2 text-sm font-bold hover:bg-white/20"
                   >
-                    <Navigation className="h-4 w-4" /> {showMap ? 'إخفاء الخريطة' : 'عرض الخريطة'}
+                    <Navigation className="h-4 w-4" /> {showMap ? 'Hide Map' : 'Show Map'}
                   </button>
                 </div>
                 <div className="h-[260px] sm:h-[320px]">
@@ -366,13 +366,13 @@ export default function PublicIdentifyPage({ params }: { params: Promise<{ token
                     <MapClient center={coordinates} marker={coordinates} />
                   ) : (
                     <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center text-white/75">
-                      <p className="max-w-md text-sm leading-7">اضغط لعرض الخريطة التفاعلية بالموقع المسجل.</p>
+                      <p className="max-w-md text-sm leading-7">Tap to view the interactive map with the registered location.</p>
                       <button
                         type="button"
                         onClick={() => setShowMap(true)}
                         className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-3 font-black text-[#014CB3] shadow-lg"
                       >
-                        <MapPin className="h-4 w-4" /> تحميل الخريطة
+                        <MapPin className="h-4 w-4" /> Load Map
                       </button>
                     </div>
                   )}
@@ -387,7 +387,7 @@ export default function PublicIdentifyPage({ params }: { params: Promise<{ token
 
             {/* ── Safety footer ── */}
             <div className="rounded-[2rem] border border-white/20 bg-white/10 p-5 text-center text-sm leading-7 text-white/75 shadow-2xl backdrop-blur">
-              يتم عرض بيانات التعريف المخصصة لعملية الاسترداد فقط. البيانات الحساسة محمية داخل منصة RETURN.
+              Only identification data relevant to the recovery process is displayed. Sensitive data is protected within the RETURN platform.
             </div>
           </div>
         ) : null}

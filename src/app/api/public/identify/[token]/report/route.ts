@@ -61,16 +61,16 @@ export async function POST(request: Request, context: { params: Promise<{ token:
     const displayLabel = profile.displayName;
 
     const title = isPerson
-      ? `🚨 تم العثور على ${displayLabel} الآن!`
-      : `🚨 تم العثور على ${displayLabel} الآن!`;
+      ? `🚨 ${displayLabel} Has Been Found!`
+      : `🚨 ${displayLabel} Has Been Found!`;
 
     const locationNote = finderLatitude !== null && finderLongitude !== null
-      ? 'اضغط لعرض الموقع الجغرافي الدقيق على الخريطة.'
-      : 'لم يتم تحديد الموقع الجغرافي بعد.';
+      ? 'Tap to view the exact location on the map.'
+      : 'Location could not be determined.';
 
     const body = isPerson
-      ? `شخص وجد ${displayLabel} وقام بمسح التاج. ${locationNote}`
-      : `شخص وجد ${displayLabel} وقام بمسح التاج. ${locationNote}`;
+      ? `Someone found ${displayLabel} and scanned the tag. ${locationNote}`
+      : `Someone found ${displayLabel} and scanned the tag. ${locationNote}`;
 
     await prisma.notification.create({
       data: {
