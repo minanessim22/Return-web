@@ -55,6 +55,43 @@ export async function POST(request: Request, context: { params: Promise<{ token:
     }
   });
 
+  // Persist the coordinates on the profile and all linked active devices
+  if (finderLatitude !== null && finderLongitude !== null) {
+    await prisma.identificationProfile.update({
+      where: { id: profile.id },
+      data: {
+        latitude: finderLatitude,
+        longitude: finderLongitude
+      }
+    });
+
+    const activeLinks = await prisma.deviceLink.findMany({
+      where: { profileId: profile.id, unlinkedAt: null },
+      include: { device: true }
+    });
+
+    for (const link of activeLinks) {
+      await prisma.gpsLocation.create({
+        data: {
+          deviceId: link.device.id,
+          latitude: finderLatitude,
+          longitude: finderLongitude,
+          recordedAt: new Date()
+        }
+      });
+
+      await prisma.locationHistory.create({
+        data: {
+          deviceId: link.device.serialNumber,
+          lat: finderLatitude,
+          lon: finderLongitude,
+          recordedAt: new Date(),
+          source: 'finder_scan'
+        }
+      });
+    }
+  }
+
   // Notify the profile owner
   if (profile.ownerUserId) {
     const isPerson = isPersonProfile(profile.category);

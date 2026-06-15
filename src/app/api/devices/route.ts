@@ -48,6 +48,8 @@ export async function GET() {
 
     const formattedDevices = dbDevices.map((d: any) => {
       const latestLoc = d.gpsLocations?.[0];
+      const fallbackLat = d.links?.[0]?.profile?.latitude;
+      const fallbackLng = d.links?.[0]?.profile?.longitude;
       return {
         id: d.id,
         serialNumber: d.serialNumber,
@@ -63,8 +65,8 @@ export async function GET() {
         updateIntervalMinutes: d.updateIntervalMinutes ?? undefined,
         trackingEnabled: d.trackingEnabled,
         linkedProfileId: d.links?.[0]?.profileId || undefined,
-        latitude: latestLoc?.latitude || undefined,
-        longitude: latestLoc?.longitude || undefined,
+        latitude: latestLoc?.latitude !== undefined ? latestLoc.latitude : (fallbackLat !== null ? fallbackLat : undefined),
+        longitude: latestLoc?.longitude !== undefined ? latestLoc.longitude : (fallbackLng !== null ? fallbackLng : undefined),
         locationHistory: [],
         links: [],
         notifications: [],

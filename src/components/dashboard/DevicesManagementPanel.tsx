@@ -75,9 +75,9 @@ function toDraft(device?: DeviceItem): DeviceDraft {
     updateIntervalMinutes: device.updateIntervalMinutes ? String(device.updateIntervalMinutes) : '5',
     linkedProfileId: device.linkedProfileId || '',
     lastLocationText: device.lastLocationText || '',
-    latitude: device.latitude !== undefined ? String(device.latitude) : '',
-    longitude: device.longitude !== undefined ? String(device.longitude) : '',
-    batteryLevel: device.batteryLevel !== undefined ? String(device.batteryLevel) : ''
+    latitude: (device.latitude !== undefined && device.latitude !== null) ? String(device.latitude) : '',
+    longitude: (device.longitude !== undefined && device.longitude !== null) ? String(device.longitude) : '',
+    batteryLevel: (device.batteryLevel !== undefined && device.batteryLevel !== null) ? String(device.batteryLevel) : ''
   };
 }
 

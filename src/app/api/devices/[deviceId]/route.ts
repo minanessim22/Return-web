@@ -136,10 +136,14 @@ export async function PATCH(request: Request, context: { params: Promise<{ devic
       }
     });
 
-    // Get current link
+    // Get current link and profile for fallback coordinates
     const activeLink = await prisma.deviceLink.findFirst({
       where: { deviceId, unlinkedAt: null }
     });
+
+    const profile = activeLink ? await prisma.identificationProfile.findUnique({
+      where: { id: activeLink.profileId }
+    }) : null;
 
     const latestLoc = await prisma.gpsLocation.findFirst({
       where: { deviceId },
@@ -149,8 +153,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ devic
     const item = {
       ...updatedDevice,
       linkedProfileId: activeLink?.profileId || undefined,
-      latitude: latestLoc?.latitude || undefined,
-      longitude: latestLoc?.longitude || undefined,
+      latitude: latestLoc?.latitude !== undefined ? latestLoc.latitude : (profile?.latitude !== null ? profile?.latitude : undefined),
+      longitude: latestLoc?.longitude !== undefined ? latestLoc.longitude : (profile?.longitude !== null ? profile?.longitude : undefined),
       locationHistory: [],
       links: [],
       notifications: [],
