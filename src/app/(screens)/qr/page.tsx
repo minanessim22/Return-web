@@ -87,13 +87,15 @@ export default function QRPage() {
     type: 'Child',
     name: '',
     photo: '',
-    location: '',
-    latitude: '',
-    longitude: '',
-    dateTime: new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16),
+    location: '', // maps to lastLocationText
     emergencyContact: user?.phone || '',
-    description: '',
-    notes: ''
+    contactName: user?.name || '',
+    relation: 'Owner',
+    age: '',
+    bloodType: '',
+    medicalNotes: '',
+    clothesColor: '',
+    notes: '' // maps to instructions/special notes
   });
   const [qrDataUrl, setQrDataUrl] = useState('');
   const [publicUrl, setPublicUrl] = useState('');
@@ -102,24 +104,18 @@ export default function QRPage() {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [locating, setLocating] = useState(false);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (user?.phone && !form.emergencyContact) {
       setForm((prev) => ({ ...prev, emergencyContact: user.phone || '' }));
     }
-  }, [form.emergencyContact, user?.phone]);
+    if (user?.name && !form.contactName) {
+      setForm((prev) => ({ ...prev, contactName: user.name || '' }));
+    }
+  }, [form.emergencyContact, form.contactName, user?.phone, user?.name]);
 
   const emergencyPhone = form.emergencyContact || user?.phone || '';
-
-  const previewNotes = useMemo(() => {
-    const parts = [form.notes.trim()];
-    if (form.dateTime) {
-      parts.push(`Recorded date/time: ${formatDate(form.dateTime)}`);
-    }
-    return parts.filter(Boolean).join('\n');
-  }, [form.dateTime, form.notes]);
 
   const handleChange = (key: keyof typeof form, value: string) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -135,34 +131,6 @@ export default function QRPage() {
     }
   };
 
-  const handleUseCurrentLocation = () => {
-    if (typeof navigator === 'undefined' || !navigator.geolocation) {
-      setError('Geolocation is not available in this browser.');
-      return;
-    }
-
-    setLocating(true);
-    setError('');
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const latitude = position.coords.latitude.toFixed(6);
-        const longitude = position.coords.longitude.toFixed(6);
-        setForm((prev) => ({
-          ...prev,
-          latitude,
-          longitude,
-          location: prev.location || `Lat ${latitude}, Lng ${longitude}`
-        }));
-        setLocating(false);
-      },
-      (geoError) => {
-        setLocating(false);
-        setError(geoError.message || 'Unable to capture the current location.');
-      },
-      { enableHighAccuracy: true, timeout: 10000 }
-    );
-  };
-
   const generateQrImage = async () => {
     if (!form.name.trim()) {
       setError('Please enter the profile name first.');
@@ -175,23 +143,23 @@ export default function QRPage() {
     setCopied(false);
 
     try {
+      const isObject = form.type === 'Object';
       const created = await api.createIdentificationProfile({
         displayName: form.name.trim(),
         type: form.type,
         category: form.type,
         photo: form.photo || undefined,
-        location: form.location || undefined,
-        lastLocationText: form.location || undefined,
-        latitude: form.latitude ? Number(form.latitude) : undefined,
-        longitude: form.longitude ? Number(form.longitude) : undefined,
-        age: form.description ? Number(form.description.replace(/[^0-9]/g, '')) || undefined : undefined,
-        notes: previewNotes,
-        medicalNotes: form.description || undefined,
+        lastLocationText: form.location.trim() || undefined,
+        age: !isObject && form.age ? Number(form.age) : undefined,
+        notes: form.notes.trim() || undefined,
+        medicalNotes: !isObject ? (form.medicalNotes.trim() || undefined) : undefined,
+        clothesColor: isObject ? (form.clothesColor.trim() || undefined) : undefined,
+        bloodType: (!isObject && form.type !== 'Pet') ? (form.bloodType.trim() || undefined) : undefined,
         emergencyContact: emergencyPhone,
         emergencyContacts: [
           {
-            contactName: user?.name || 'Owner',
-            relation: 'Owner',
+            contactName: form.contactName.trim() || user?.name || 'Owner',
+            relation: form.relation.trim() || 'Owner',
             phone: emergencyPhone
           }
         ],
@@ -212,9 +180,9 @@ export default function QRPage() {
         JSON.stringify({
           id: created.item.id,
           name: created.item.displayName,
-          description: form.description || 'No description',
+          description: isObject ? form.clothesColor : (form.medicalNotes || 'No medical notes'),
           location: created.item.lastLocationText || 'Unknown location',
-          dateTime: form.dateTime || new Date().toISOString(),
+          dateTime: new Date().toISOString(),
           photo: created.item.photoUrl || form.photo || null,
           token: qrInfo.token
         })
@@ -289,7 +257,7 @@ export default function QRPage() {
 
               <label className="space-y-2 text-sm">
                 <span className="font-bold text-white/80">Name / item model</span>
-                <input value={form.name} onChange={(event) => handleChange('name', event.target.value)} placeholder="Ahmed, bracelet, school bag..." className="w-full rounded-2xl bg-white/95 px-4 py-3 text-slate-900 outline-none" />
+                <input value={form.name} onChange={(event) => handleChange('name', event.target.value)} placeholder="Ahmed, wallet, school bag..." className="w-full rounded-2xl bg-white/95 px-4 py-3 text-slate-900 outline-none" />
               </label>
 
               <div className="space-y-2 text-sm md:col-span-2">
@@ -309,45 +277,78 @@ export default function QRPage() {
                 </div>
               </div>
 
-              <div className="space-y-2 text-sm md:col-span-2">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="font-bold text-white/80">Last known location</span>
-                  <button type="button" onClick={handleUseCurrentLocation} disabled={locating} className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-black text-white hover:bg-white/20 disabled:opacity-60">
-                    {locating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Navigation className="h-4 w-4" />} Use current location
-                  </button>
-                </div>
-                <input value={form.location} onChange={(event) => handleChange('location', event.target.value)} placeholder="Damanhur, Beheira..." className="w-full rounded-2xl bg-white/95 px-4 py-3 text-slate-900 outline-none" />
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                  <input value={form.latitude} onChange={(event) => handleChange('latitude', event.target.value)} placeholder="Latitude" className="w-full rounded-2xl bg-white/95 px-4 py-3 text-slate-900 outline-none" />
-                  <input value={form.longitude} onChange={(event) => handleChange('longitude', event.target.value)} placeholder="Longitude" className="w-full rounded-2xl bg-white/95 px-4 py-3 text-slate-900 outline-none" />
-                </div>
+              <label className="space-y-2 text-sm md:col-span-2">
+                <span className="font-bold text-white/80">Approximate Address / City</span>
+                <input value={form.location} onChange={(event) => handleChange('location', event.target.value)} placeholder="e.g. Tagamoa, Cairo (helps finder narrow down home area)" className="w-full rounded-2xl bg-white/95 px-4 py-3 text-slate-900 outline-none" />
+              </label>
+
+              {/* Emergency Contact Group */}
+              <div className="grid grid-cols-1 gap-5 md:grid-cols-3 md:col-span-2 border-t border-white/10 pt-5 mt-2">
+                <label className="space-y-2 text-sm">
+                  <span className="font-bold text-white/80">Contact Name</span>
+                  <input value={form.contactName} onChange={(event) => handleChange('contactName', event.target.value)} placeholder="e.g. Mohamed" className="w-full rounded-2xl bg-white/95 px-4 py-3 text-slate-900 outline-none" />
+                </label>
+
+                <label className="space-y-2 text-sm">
+                  <span className="font-bold text-white/80">Emergency Phone</span>
+                  <div className="relative">
+                    <Phone className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                    <input value={form.emergencyContact} onChange={(event) => handleChange('emergencyContact', event.target.value)} placeholder="010xxxxxxxx" className="w-full rounded-2xl bg-white/95 py-3 pl-11 pr-4 text-slate-900 outline-none" />
+                  </div>
+                </label>
+
+                <label className="space-y-2 text-sm">
+                  <span className="font-bold text-white/80">Relation / Role</span>
+                  <input value={form.relation} onChange={(event) => handleChange('relation', event.target.value)} placeholder="e.g. Father, Mother, Owner" className="w-full rounded-2xl bg-white/95 px-4 py-3 text-slate-900 outline-none" />
+                </label>
               </div>
 
-              <label className="space-y-2 text-sm">
-                <span className="font-bold text-white/80">Date / time</span>
-                <div className="relative">
-                  <CalendarDays className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-                  <input type="datetime-local" value={form.dateTime} onChange={(event) => handleChange('dateTime', event.target.value)} className="w-full rounded-2xl bg-white/95 py-3 pl-11 pr-4 text-slate-900 outline-none" />
+              {/* Dynamic Sections Based on Type */}
+              {form.type !== 'Object' ? (
+                <div className="grid grid-cols-1 gap-5 md:grid-cols-2 md:col-span-2 border-t border-white/10 pt-5 mt-2">
+                  <label className="space-y-2 text-sm">
+                    <span className="font-bold text-white/80">Age (years)</span>
+                    <input type="number" min="0" value={form.age} onChange={(event) => handleChange('age', event.target.value)} placeholder="e.g. 8" className="w-full rounded-2xl bg-white/95 px-4 py-3 text-slate-900 outline-none" />
+                  </label>
+
+                  {form.type !== 'Pet' ? (
+                    <label className="space-y-2 text-sm">
+                      <span className="font-bold text-white/80">Blood Type</span>
+                      <select value={form.bloodType} onChange={(event) => handleChange('bloodType', event.target.value)} className="w-full rounded-2xl bg-white/95 px-4 py-3 text-slate-900 outline-none">
+                        <option value="">Unknown / Select</option>
+                        <option value="A+">A+</option>
+                        <option value="A-">A-</option>
+                        <option value="B+">B+</option>
+                        <option value="B-">B-</option>
+                        <option value="AB+">AB+</option>
+                        <option value="AB-">AB-</option>
+                        <option value="O+">O+</option>
+                        <option value="O-">O-</option>
+                      </select>
+                    </label>
+                  ) : <div className="hidden md:block" />}
+
+                  <label className="space-y-2 text-sm md:col-span-2">
+                    <span className="font-bold text-white/80">Medical Notes / Critical Conditions</span>
+                    <textarea rows={3} value={form.medicalNotes} onChange={(event) => handleChange('medicalNotes', event.target.value)} placeholder="e.g. Autism, suffers from asthma, wears glasses..." className="w-full rounded-2xl bg-white/95 px-4 py-3 text-slate-900 outline-none resize-none" />
+                  </label>
                 </div>
-              </label>
-
-              <label className="space-y-2 text-sm">
-                <span className="font-bold text-white/80">Emergency phone</span>
-                <div className="relative">
-                  <Phone className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-                  <input value={form.emergencyContact} onChange={(event) => handleChange('emergencyContact', event.target.value)} placeholder="010xxxxxxxx" className="w-full rounded-2xl bg-white/95 py-3 pl-11 pr-4 text-slate-900 outline-none" />
+              ) : (
+                <div className="grid grid-cols-1 gap-5 md:col-span-2 border-t border-white/10 pt-5 mt-2">
+                  <label className="space-y-2 text-sm">
+                    <span className="font-bold text-white/80">Item Description / Brand / Model</span>
+                    <textarea rows={3} value={form.clothesColor} onChange={(event) => handleChange('clothesColor', event.target.value)} placeholder="e.g. Black leather wallet, contains IDs, silver buckle..." className="w-full rounded-2xl bg-white/95 px-4 py-3 text-slate-900 outline-none resize-none" />
+                  </label>
                 </div>
-              </label>
+              )}
 
-              <label className="space-y-2 text-sm">
-                <span className="font-bold text-white/80">Description / age / model</span>
-                <input value={form.description} onChange={(event) => handleChange('description', event.target.value)} placeholder="10 years, navy hoodie, serial model..." className="w-full rounded-2xl bg-white/95 px-4 py-3 text-slate-900 outline-none" />
-              </label>
-
-              <label className="space-y-2 text-sm">
-                <span className="font-bold text-white/80">Finder notes</span>
-                <input value={form.notes} onChange={(event) => handleChange('notes', event.target.value)} placeholder="Any medical, safety, or handling notes" className="w-full rounded-2xl bg-white/95 px-4 py-3 text-slate-900 outline-none" />
-              </label>
+              {/* Instructions for Finder */}
+              <div className="space-y-2 text-sm md:col-span-2 border-t border-white/10 pt-5 mt-2">
+                <label className="space-y-2 text-sm">
+                  <span className="font-bold text-white/80">Instructions for Finder / Special Notes</span>
+                  <textarea rows={3} value={form.notes} onChange={(event) => handleChange('notes', event.target.value)} placeholder="e.g. Please call immediately, reward if returned safe..." className="w-full rounded-2xl bg-white/95 px-4 py-3 text-slate-900 outline-none resize-none" />
+                </label>
+              </div>
             </div>
 
             <div className="mt-6 rounded-[1.5rem] border border-white/15 bg-white/10 p-4">
@@ -421,7 +422,11 @@ export default function QRPage() {
                 </div>
                 <div className="rounded-[1.5rem] border border-white/15 bg-white/5 p-4">
                   <p className="text-xs font-black uppercase tracking-[0.18em] text-white/60">Description</p>
-                  <p className="mt-2 leading-6">{form.description || 'No description yet.'}</p>
+                  <p className="mt-2 leading-6">
+                    {form.type === 'Object'
+                      ? (form.clothesColor || 'No description yet.')
+                      : (form.medicalNotes || 'No medical notes yet.')}
+                  </p>
                 </div>
               </div>
             </div>
