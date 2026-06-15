@@ -174,7 +174,12 @@ export default function PublicIdentifyPage({ params }: { params: Promise<{ token
   }, [isPerson, primaryContact, item?.displayName]);
 
   const coordinates = useMemo(() => {
-    if (item?.latitude === undefined || item?.longitude === undefined) return null;
+    if (
+      item?.latitude === undefined || item?.latitude === null ||
+      item?.longitude === undefined || item?.longitude === null
+    ) {
+      return null;
+    }
     return [item.latitude, item.longitude] as [number, number];
   }, [item?.latitude, item?.longitude]);
 
