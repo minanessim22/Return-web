@@ -21,8 +21,6 @@ import { api } from '@/lib/api';
 import { useAuth } from '@/components/providers/AuthProvider';
 import type { IdentificationProfile } from '@/lib/shared-types';
 
-const MapClient = dynamic(() => import('@/components/Map'), { ssr: false });
-
 function formatDate(value?: string) {
   if (!value) return '—';
   const date = new Date(value);
@@ -45,20 +43,21 @@ export default function NFCPage() {
     type: 'Child',
     name: '',
     photo: '',
-    location: '',
-    latitude: '',
-    longitude: '',
-    dateTime: new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16),
+    location: '', // maps to lastLocationText
     emergencyContact: user?.phone || '',
-    description: '',
-    notes: '',
+    contactName: user?.name || '',
+    relation: 'Owner',
+    age: '',
+    bloodType: '',
+    medicalNotes: '',
+    clothesColor: '',
+    notes: '', // maps to instructions/special notes
     nfcTagUid: '',
     hardwareModel: 'SMART_TAG_LITE' as 'SMART_TAG_LITE' | 'SMART_TAG_PRO'
   });
   const [linkingState, setLinkingStatus] = useState<'idle' | 'progress' | 'success'>('idle');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
-  const [locating, setLocating] = useState(false);
   const [copied, setCopied] = useState(false);
   const [linkedProfile, setLinkedProfile] = useState<IdentificationProfile | null>(null);
   const [linkedTagUid, setLinkedTagUid] = useState('');
@@ -74,18 +73,14 @@ export default function NFCPage() {
     if (user?.phone && !form.emergencyContact) {
       setForm((prev) => ({ ...prev, emergencyContact: user.phone || '' }));
     }
-  }, [form.emergencyContact, user?.phone]);
+    if (user?.name && !form.contactName) {
+      setForm((prev) => ({ ...prev, contactName: user.name || '' }));
+    }
+  }, [form.emergencyContact, form.contactName, user?.phone, user?.name]);
 
   const handleChange = (field: keyof typeof form, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
-
-  const coordinates = useMemo(() => {
-    const latitude = Number(form.latitude);
-    const longitude = Number(form.longitude);
-    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return undefined;
-    return [latitude, longitude] as [number, number];
-  }, [form.latitude, form.longitude]);
 
   const handlePhotoUpload = async (file?: File) => {
     if (!file) return;
@@ -95,34 +90,6 @@ export default function NFCPage() {
     } catch (uploadError) {
       setError(uploadError instanceof Error ? uploadError.message : 'Unable to read the selected image.');
     }
-  };
-
-  const handleUseCurrentLocation = () => {
-    if (typeof navigator === 'undefined' || !navigator.geolocation) {
-      setError('Geolocation is not available in this browser.');
-      return;
-    }
-
-    setLocating(true);
-    setError('');
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const latitude = position.coords.latitude.toFixed(6);
-        const longitude = position.coords.longitude.toFixed(6);
-        setForm((prev) => ({
-          ...prev,
-          latitude,
-          longitude,
-          location: prev.location || `Lat ${latitude}, Lng ${longitude}`
-        }));
-        setLocating(false);
-      },
-      (geoError) => {
-        setLocating(false);
-        setError(geoError.message || 'Unable to capture the current location.');
-      },
-      { enableHighAccuracy: true, timeout: 10000 }
-    );
   };
 
   const handleLink = async () => {
@@ -137,27 +104,23 @@ export default function NFCPage() {
     setLinkingStatus('progress');
 
     try {
-      const notes = [form.notes.trim(), form.dateTime ? `Recorded date/time: ${formatDate(form.dateTime)}` : '']
-        .filter(Boolean)
-        .join('\n');
-
+      const isObject = form.type === 'Object';
       const created = await api.createIdentificationProfile({
         displayName: form.name.trim(),
         type: form.type,
         category: form.type,
         photo: form.photo || undefined,
-        location: form.location || undefined,
-        lastLocationText: form.location || undefined,
-        latitude: form.latitude ? Number(form.latitude) : undefined,
-        longitude: form.longitude ? Number(form.longitude) : undefined,
-        age: form.description ? Number(form.description.replace(/[^0-9]/g, '')) || undefined : undefined,
-        notes,
-        medicalNotes: form.description || undefined,
+        lastLocationText: form.location.trim() || undefined,
+        age: !isObject && form.age ? Number(form.age) : undefined,
+        notes: form.notes.trim() || undefined,
+        medicalNotes: !isObject ? (form.medicalNotes.trim() || undefined) : undefined,
+        clothesColor: isObject ? (form.clothesColor.trim() || undefined) : undefined,
+        bloodType: (!isObject && form.type !== 'Pet') ? (form.bloodType.trim() || undefined) : undefined,
         emergencyContact: form.emergencyContact || user?.phone || '',
         emergencyContacts: [
           {
-            contactName: user?.name || 'Owner',
-            relation: 'Owner',
+            contactName: form.contactName.trim() || user?.name || 'Owner',
+            relation: form.relation.trim() || 'Owner',
             phone: form.emergencyContact || user?.phone || ''
           }
         ]
@@ -248,11 +211,9 @@ export default function NFCPage() {
                   <option value="SMART_TAG_PRO">Smart Tag Pro - NFC + Barcode + GPS</option>
                 </select>
                 <p className="text-xs leading-6 text-white/70">Lite is for NFC + barcode only. Pro keeps the same NFC/barcode flow and also exposes a GPS telemetry endpoint for the hardware tracker.</p>
-              </label>
-
-              <label className="space-y-2 text-sm">
+              </label>              <label className="space-y-2 text-sm">
                 <span className="font-bold text-white/80">Name / item model</span>
-                <input value={form.name} onChange={(event) => handleChange('name', event.target.value)} placeholder="Ahmed, bracelet, school bag..." className="w-full rounded-2xl bg-white/95 px-4 py-3 text-slate-900 outline-none" />
+                <input value={form.name} onChange={(event) => handleChange('name', event.target.value)} placeholder="Ahmed, wallet, school bag..." className="w-full rounded-2xl bg-white/95 px-4 py-3 text-slate-900 outline-none" />
               </label>
 
               <div className="space-y-2 text-sm md:col-span-2">
@@ -271,50 +232,80 @@ export default function NFCPage() {
                 </div>
               </div>
 
-              <div className="space-y-2 text-sm md:col-span-2">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="font-bold text-white/80">Location</span>
-                  <button type="button" onClick={handleUseCurrentLocation} disabled={locating} className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-black text-white hover:bg-white/20 disabled:opacity-60">
-                    {locating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Navigation className="h-4 w-4" />} Use current location
-                  </button>
-                </div>
-                <div className="relative">
-                  <MapPin className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-                  <input value={form.location} onChange={(event) => handleChange('location', event.target.value)} placeholder="Damanhur, Beheira..." className="w-full rounded-2xl bg-white/95 py-3 pl-11 pr-4 text-slate-900 outline-none" />
-                </div>
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                  <input value={form.latitude} onChange={(event) => handleChange('latitude', event.target.value)} placeholder="Latitude" className="w-full rounded-2xl bg-white/95 px-4 py-3 text-slate-900 outline-none" />
-                  <input value={form.longitude} onChange={(event) => handleChange('longitude', event.target.value)} placeholder="Longitude" className="w-full rounded-2xl bg-white/95 px-4 py-3 text-slate-900 outline-none" />
-                </div>
+              <label className="space-y-2 text-sm md:col-span-2">
+                <span className="font-bold text-white/80">Approximate Address / City</span>
+                <input value={form.location} onChange={(event) => handleChange('location', event.target.value)} placeholder="e.g. Tagamoa, Cairo (helps finder narrow down home area)" className="w-full rounded-2xl bg-white/95 px-4 py-3 text-slate-900 outline-none" />
+              </label>
+
+              {/* Emergency Contact Group */}
+              <div className="grid grid-cols-1 gap-5 md:grid-cols-3 md:col-span-2 border-t border-white/10 pt-5 mt-2">
+                <label className="space-y-2 text-sm">
+                  <span className="font-bold text-white/80">Contact Name</span>
+                  <input value={form.contactName} onChange={(event) => handleChange('contactName', event.target.value)} placeholder="e.g. Mohamed" className="w-full rounded-2xl bg-white/95 px-4 py-3 text-slate-900 outline-none" />
+                </label>
+
+                <label className="space-y-2 text-sm">
+                  <span className="font-bold text-white/80">Emergency Phone</span>
+                  <div className="relative">
+                    <Phone className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                    <input value={form.emergencyContact} onChange={(event) => handleChange('emergencyContact', event.target.value)} placeholder="010xxxxxxxx" className="w-full rounded-2xl bg-white/95 py-3 pl-11 pr-4 text-slate-900 outline-none" />
+                  </div>
+                </label>
+
+                <label className="space-y-2 text-sm">
+                  <span className="font-bold text-white/80">Relation / Role</span>
+                  <input value={form.relation} onChange={(event) => handleChange('relation', event.target.value)} placeholder="e.g. Father, Mother, Owner" className="w-full rounded-2xl bg-white/95 px-4 py-3 text-slate-900 outline-none" />
+                </label>
               </div>
 
-              <label className="space-y-2 text-sm">
-                <span className="font-bold text-white/80">Date / time</span>
-                <div className="relative">
-                  <CalendarDays className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-                  <input type="datetime-local" value={form.dateTime} onChange={(event) => handleChange('dateTime', event.target.value)} className="w-full rounded-2xl bg-white/95 py-3 pl-11 pr-4 text-slate-900 outline-none" />
+              {/* Dynamic Sections Based on Type */}
+              {form.type !== 'Object' ? (
+                <div className="grid grid-cols-1 gap-5 md:grid-cols-2 md:col-span-2 border-t border-white/10 pt-5 mt-2">
+                  <label className="space-y-2 text-sm">
+                    <span className="font-bold text-white/80">Age (years)</span>
+                    <input type="number" min="0" value={form.age} onChange={(event) => handleChange('age', event.target.value)} placeholder="e.g. 8" className="w-full rounded-2xl bg-white/95 px-4 py-3 text-slate-900 outline-none" />
+                  </label>
+
+                  {form.type !== 'Pet' ? (
+                    <label className="space-y-2 text-sm">
+                      <span className="font-bold text-white/80">Blood Type</span>
+                      <select value={form.bloodType} onChange={(event) => handleChange('bloodType', event.target.value)} className="w-full rounded-2xl bg-white/95 px-4 py-3 text-slate-900 outline-none">
+                        <option value="">Unknown / Select</option>
+                        <option value="A+">A+</option>
+                        <option value="A-">A-</option>
+                        <option value="B+">B+</option>
+                        <option value="B-">B-</option>
+                        <option value="AB+">AB+</option>
+                        <option value="AB-">AB-</option>
+                        <option value="O+">O+</option>
+                        <option value="O-">O-</option>
+                      </select>
+                    </label>
+                  ) : <div className="hidden md:block" />}
+
+                  <label className="space-y-2 text-sm md:col-span-2">
+                    <span className="font-bold text-white/80">Medical Notes / Critical Conditions</span>
+                    <textarea rows={3} value={form.medicalNotes} onChange={(event) => handleChange('medicalNotes', event.target.value)} placeholder="e.g. Autism, suffers from asthma, wears glasses..." className="w-full rounded-2xl bg-white/95 px-4 py-3 text-slate-900 outline-none resize-none" />
+                  </label>
                 </div>
-              </label>
-
-              <label className="space-y-2 text-sm">
-                <span className="font-bold text-white/80">Emergency phone</span>
-                <div className="relative">
-                  <Phone className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-                  <input value={form.emergencyContact} onChange={(event) => handleChange('emergencyContact', event.target.value)} placeholder="010xxxxxxxx" className="w-full rounded-2xl bg-white/95 py-3 pl-11 pr-4 text-slate-900 outline-none" />
+              ) : (
+                <div className="grid grid-cols-1 gap-5 md:col-span-2 border-t border-white/10 pt-5 mt-2">
+                  <label className="space-y-2 text-sm">
+                    <span className="font-bold text-white/80">Item Description / Brand / Model</span>
+                    <textarea rows={3} value={form.clothesColor} onChange={(event) => handleChange('clothesColor', event.target.value)} placeholder="e.g. Black leather wallet, contains IDs, silver buckle..." className="w-full rounded-2xl bg-white/95 px-4 py-3 text-slate-900 outline-none resize-none" />
+                  </label>
                 </div>
-              </label>
+              )}
 
-              <label className="space-y-2 text-sm">
-                <span className="font-bold text-white/80">Description / age / model</span>
-                <input value={form.description} onChange={(event) => handleChange('description', event.target.value)} placeholder="10 years, navy hoodie, serial model..." className="w-full rounded-2xl bg-white/95 px-4 py-3 text-slate-900 outline-none" />
-              </label>
+              {/* Instructions for Finder */}
+              <div className="space-y-2 text-sm md:col-span-2 border-t border-white/10 pt-5 mt-2">
+                <label className="space-y-2 text-sm">
+                  <span className="font-bold text-white/80">Instructions for Finder / Special Notes</span>
+                  <textarea rows={3} value={form.notes} onChange={(event) => handleChange('notes', event.target.value)} placeholder="e.g. Please call immediately, reward if returned safe..." className="w-full rounded-2xl bg-white/95 px-4 py-3 text-slate-900 outline-none resize-none" />
+                </label>
+              </div>
 
-              <label className="space-y-2 text-sm">
-                <span className="font-bold text-white/80">Finder notes</span>
-                <input value={form.notes} onChange={(event) => handleChange('notes', event.target.value)} placeholder="Any extra instructions for the finder" className="w-full rounded-2xl bg-white/95 px-4 py-3 text-slate-900 outline-none" />
-              </label>
-
-              <label className="space-y-2 text-sm md:col-span-2">
+              <label className="space-y-2 text-sm md:col-span-2 border-t border-white/10 pt-5">
                 <span className="font-bold text-white/80">NFC tag UID</span>
                 <div className="rounded-[1.5rem] border border-white/15 bg-white/10 p-4">
                   <div className="flex flex-wrap items-center gap-3">
@@ -367,16 +358,6 @@ export default function NFCPage() {
                     <ExternalLink className="h-4 w-4" /> Open public profile
                   </Link>
                 ) : null}
-              </div>
-            </div>
-
-            <div className="overflow-hidden rounded-[2rem] border border-white/20 bg-white/10 shadow-2xl backdrop-blur">
-              <div className="flex items-center gap-3 border-b border-white/10 px-5 py-4">
-                <MapPin className="h-5 w-5" />
-                <h2 className="text-xl font-black">Location preview</h2>
-              </div>
-              <div className="h-[260px]">
-                {coordinates ? <MapClient center={coordinates} marker={coordinates} /> : <div className="flex h-full items-center justify-center px-6 text-center text-sm text-white/70">Choose a real location or tap “Use current location” to store coordinates with the NFC record.</div>}
               </div>
             </div>
 
