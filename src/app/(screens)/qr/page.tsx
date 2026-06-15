@@ -28,12 +28,49 @@ function formatDate(value?: string) {
   return date.toLocaleString();
 }
 
-function fileToDataUrl(file: File) {
+const IMAGE_MAX_DIMENSION = 1200;
+const IMAGE_QUALITY = 0.7;
+
+function compressImage(file: File): Promise<string> {
   return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result || ''));
-    reader.onerror = () => reject(new Error('Unable to read the selected image.'));
-    reader.readAsDataURL(file);
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+
+      let { width, height } = img;
+
+      // Only resize if the image exceeds the max dimension
+      if (width > IMAGE_MAX_DIMENSION || height > IMAGE_MAX_DIMENSION) {
+        const ratio = Math.min(IMAGE_MAX_DIMENSION / width, IMAGE_MAX_DIMENSION / height);
+        width = Math.round(width * ratio);
+        height = Math.round(height * ratio);
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        reject(new Error('Unable to create canvas context for image compression.'));
+        return;
+      }
+
+      ctx.drawImage(img, 0, 0, width, height);
+
+      // Encode as JPEG at reduced quality to shrink the payload
+      const compressedDataUrl = canvas.toDataURL('image/jpeg', IMAGE_QUALITY);
+      resolve(compressedDataUrl);
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error('Unable to load the selected image for compression.'));
+    };
+
+    img.src = objectUrl;
   });
 }
 
@@ -91,8 +128,8 @@ export default function QRPage() {
   const handlePhotoUpload = async (file?: File) => {
     if (!file) return;
     try {
-      const dataUrl = await fileToDataUrl(file);
-      setForm((prev) => ({ ...prev, photo: dataUrl }));
+      const compressedDataUrl = await compressImage(file);
+      setForm((prev) => ({ ...prev, photo: compressedDataUrl }));
     } catch (uploadError) {
       setError(uploadError instanceof Error ? uploadError.message : 'Unable to read the selected image.');
     }
