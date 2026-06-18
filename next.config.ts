@@ -7,7 +7,7 @@ const cspHeader = `
   style-src 'self' 'unsafe-inline';
   img-src 'self' data: blob: *.supabase.co tile.openstreetmap.org *.tile.openstreetmap.org;
   font-src 'self' data:;
-  connect-src 'self' *.supabase.co wss://*.supabase.co *.upstash.io *.ingest.sentry.io;
+  connect-src 'self' *.supabase.co wss://*.supabase.co *.upstash.io *.ingest.sentry.io router.project-osrm.org;
   frame-ancestors 'none';
   form-action 'self';
   base-uri 'self';
