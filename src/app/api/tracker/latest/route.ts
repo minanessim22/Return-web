@@ -16,45 +16,13 @@
  * ─────────────────────────────────────────────────────────────────
  */
 
-import { ensureMqttBridge, getMqttEmitter } from '@/lib/server/mqtt-bridge';
-import type { TrackerLocationEvent } from '@/lib/server/mqtt-bridge';
+import { ensureMqttBridge } from '@/lib/server/mqtt-bridge';
 import { prisma } from '@/lib/server/db';
+import { getTrackerCache } from '@/lib/server/tracker-cache';
+import type { LatestEntry } from '@/lib/server/tracker-cache';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-
-// ── In-process latest-location cache ────────────────────────────
-const GLOBAL_CACHE_KEY = '__return_tracker_latest__' as const;
-
-type LatestEntry = {
-  device_id: string;
-  lat: number | null;
-  lon: number | null;
-  battery?: number;
-  receivedAt: string;
-  topic: string;
-  alertType?: string;
-};
-
-function getCache(): Map<string, LatestEntry> {
-  const g = globalThis as unknown as Record<string, Map<string, LatestEntry> | undefined>;
-  if (!g[GLOBAL_CACHE_KEY]) {
-    g[GLOBAL_CACHE_KEY] = new Map();
-    const emitter = getMqttEmitter();
-    emitter.on('location', (event: TrackerLocationEvent) => {
-      g[GLOBAL_CACHE_KEY]!.set(event.device_id, {
-        device_id: event.device_id,
-        lat: event.lat,
-        lon: event.lon,
-        battery: event.battery,
-        receivedAt: event.receivedAt,
-        topic: event.topic,
-        alertType: event.alertType,
-      });
-    });
-  }
-  return g[GLOBAL_CACHE_KEY]!;
-}
 
 /** Fetch the most recent row from DB for a specific device */
 async function getLatestFromDb(deviceId: string): Promise<LatestEntry | null> {
@@ -78,31 +46,35 @@ async function getLatestFromDb(deviceId: string): Promise<LatestEntry | null> {
   }
 }
 
-/** Fetch the latest location history records for all devices in DB */
+/**
+ * Fetch the latest location history record for each *registered* device.
+ *
+ * IMPORTANT: We intentionally query ONLY serial numbers that exist in the
+ * `Device` table.  We do NOT union in all distinct `deviceId` values from
+ * `location_history`, because that table retains rows for passive QR/NFC
+ * scans and previously-deleted devices — including orphan entries that
+ * survive even after the DELETE transaction (e.g. QR-prefixed scan events
+ * written by the public identify route).  Including those IDs would cause
+ * deleted devices to keep appearing on the live map.
+ */
 async function getAllLatestFromDb(): Promise<Record<string, LatestEntry>> {
   const devices: Record<string, LatestEntry> = {};
   try {
-    // 1. Get all registered device serial numbers
+    // Only registered device serial numbers — deleted devices will no longer
+    // appear here because their Device row was removed by the DELETE transaction.
     const dbDevices = await prisma.device.findMany({
       select: { serialNumber: true }
     });
-    
-    // 2. Also get any other device IDs from location_history to be safe
-    const locationDevices = await prisma.locationHistory.groupBy({
-      by: ['deviceId']
-    });
-    
-    const allDeviceIds = new Set([
-      ...dbDevices.map(d => d.serialNumber).filter(Boolean),
-      ...locationDevices.map(l => l.deviceId).filter(Boolean)
-    ]);
-    
-    // 3. For each device ID, fetch the latest history record
+
+    const registeredSerials = dbDevices
+      .map(d => d.serialNumber)
+      .filter(Boolean) as string[];
+
     await Promise.all(
-      Array.from(allDeviceIds).map(async (deviceId) => {
-        const entry = await getLatestFromDb(deviceId);
+      registeredSerials.map(async (serial) => {
+        const entry = await getLatestFromDb(serial);
         if (entry) {
-          devices[deviceId] = entry;
+          devices[serial] = entry;
         }
       })
     );
@@ -115,7 +87,7 @@ async function getAllLatestFromDb(): Promise<Record<string, LatestEntry>> {
 export async function GET(request: Request) {
   ensureMqttBridge();
 
-  const cache = getCache();
+  const cache = getTrackerCache();
   const url = new URL(request.url);
   const deviceId = url.searchParams.get('device_id')?.trim();
 

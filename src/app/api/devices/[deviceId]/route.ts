@@ -3,6 +3,7 @@ import { getCurrentUser } from '@/lib/server/session';
 import { ensureSameOrigin } from '@/lib/server/security';
 import { capabilitiesFromDevice, resolveHardwareModelKey } from '@/lib/device-models';
 import { prisma } from '@/lib/server/db';
+import { purgeDeviceFromCache } from '@/lib/server/tracker-cache';
 
 export const runtime = 'nodejs';
 
@@ -232,6 +233,10 @@ export async function DELETE(request: Request, context: { params: Promise<{ devi
         where: { id: deviceId }
       })
     ]);
+
+    // Evict the deleted device from the in-process MQTT cache so the live
+    // map stops showing it immediately, even on warm serverless instances.
+    purgeDeviceFromCache(device.serialNumber);
 
     // Create notification outside the transaction (non-critical)
     await prisma.notification.create({
