@@ -25,7 +25,7 @@
 
 import React, { useEffect, useMemo, useState, useRef, memo } from 'react';
 import dynamic from 'next/dynamic';
-import { Activity, MapPin, Radio, WifiOff, Zap, Clock, Battery, Signal } from 'lucide-react';
+import { Activity, MapPin, Radio, WifiOff, Zap, Clock, Battery, Signal, Eye, EyeOff } from 'lucide-react';
 import { useTrackerStream } from '@/lib/useTrackerStream';
 import type { MarkerPoint } from '@/components/Map';
 
@@ -145,6 +145,9 @@ export function LiveTrackingMap({
   // Breadcrumb trail — chronological [lat, lon] tuples (max 100 points)
   const [trail, setTrail] = useState<[number, number][]>([]);
   const TRAIL_MAX = 100;
+
+  // Toggle: show / hide passive QR/NFC scan markers on the map
+  const [showPassiveScans, setShowPassiveScans] = useState(true);
   const historyFetchedRef = useRef(false);
 
   // ── Seed initial snapshots from database on first mount ───────
@@ -263,10 +266,22 @@ export function LiveTrackingMap({
         battery: snap.battery,
         lastSeen: snap.receivedAt,
         live: true,
+        isPassiveScan: /^(QR-|NFC-)/i.test(snap.device_id) || snap.alertType === 'scan',
       });
     }
     return result;
   }, [snapshots, deviceLabel]); // ← tick removed intentionally
+
+  // ── Filter out passive QR/NFC markers when the toggle is off ──
+  const visibleMarkers = useMemo<MarkerPoint[]>(() => {
+    if (showPassiveScans) return mapMarkers;
+    return mapMarkers.filter((m) => !m.isPassiveScan);
+  }, [mapMarkers, showPassiveScans]);
+
+  const passiveScanCount = useMemo(
+    () => mapMarkers.filter((m) => m.isPassiveScan).length,
+    [mapMarkers]
+  );
 
   const activeSnaps = useMemo(
     () => Object.values(snapshots).filter((s) => s.lat !== null && s.lon !== null),
@@ -385,10 +400,29 @@ export function LiveTrackingMap({
            */
           <StableMap
             center={defaultCenter}
-            markers={mapMarkers}
+            markers={visibleMarkers}
             zoom={15}
             trail={trail.length >= 2 ? trail : undefined}
           />
+        )}
+
+        {/* ── Passive scan toggle – floating over the map ──────── */}
+        {passiveScanCount > 0 && (
+          <button
+            type="button"
+            onClick={() => setShowPassiveScans((v) => !v)}
+            className={`absolute top-4 right-4 z-[1000] inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-black shadow-lg backdrop-blur-md transition-all duration-200 ${
+              showPassiveScans
+                ? 'bg-white/90 text-[#014CB3] border border-[#014CB3]/20 hover:bg-white'
+                : 'bg-[#014CB3]/80 text-white border border-white/20 hover:bg-[#014CB3]/90'
+            }`}
+          >
+            {showPassiveScans ? (
+              <><EyeOff className="w-3.5 h-3.5" /> {isRTL ? 'إخفاء مسح QR' : 'Hide QR Scans'}</>
+            ) : (
+              <><Eye className="w-3.5 h-3.5" /> {isRTL ? 'إظهار مسح QR' : `Show QR Scans (${passiveScanCount})`}</>
+            )}
+          </button>
         )}
 
         {/* ── Device summary cards – bottom right ─────────────── */}

@@ -194,17 +194,51 @@ export async function DELETE(request: Request, context: { params: Promise<{ devi
       return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
     }
 
-    // Delete device (cascade deletes locations and links)
-    await prisma.device.delete({
-      where: { id: deviceId }
-    });
+    // Atomic transaction: wipe device and ALL related records to prevent orphan data.
+    // Order matters — delete children before the parent to satisfy FK constraints.
+    await prisma.$transaction([
+      // 1. Delete location_history rows (linked by serialNumber string, not FK-cascaded)
+      prisma.locationHistory.deleteMany({
+        where: { deviceId: device.serialNumber }
+      }),
 
-    // Create notification
+      // 2. Delete GPS locations (FK-cascaded, but explicit for clarity & safety)
+      prisma.gpsLocation.deleteMany({
+        where: { deviceId }
+      }),
+
+      // 3. Delete scan events referencing this device
+      prisma.scanEvent.deleteMany({
+        where: { deviceId }
+      }),
+
+      // 4. Delete device links (severs connection to identification profiles)
+      prisma.deviceLink.deleteMany({
+        where: { deviceId }
+      }),
+
+      // 5. Delete geofences (uses serialNumber as deviceId string)
+      prisma.geofence.deleteMany({
+        where: { deviceId: device.serialNumber }
+      }),
+
+      // 6. Delete any registered tracker record matching this serial
+      prisma.registeredTracker.deleteMany({
+        where: { deviceId: device.serialNumber }
+      }),
+
+      // 7. Finally, delete the device record itself
+      prisma.device.delete({
+        where: { id: deviceId }
+      })
+    ]);
+
+    // Create notification outside the transaction (non-critical)
     await prisma.notification.create({
       data: {
         userId: user.id,
         title: 'Device removed',
-        body: `${device.label} was deleted from your devices.`,
+        body: `${device.label || device.serialNumber} and all its tracking data were permanently deleted.`,
         type: 'device'
       }
     });
@@ -215,3 +249,4 @@ export async function DELETE(request: Request, context: { params: Promise<{ devi
     return NextResponse.json({ error: 'Failed to delete device' }, { status: 500 });
   }
 }
+

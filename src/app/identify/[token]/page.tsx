@@ -34,6 +34,7 @@ type PublicProfile = {
   qrPublicToken: string;
   nfcTagUid?: string;
   isActive: boolean;
+  hasActiveTracker?: boolean;
   emergencyContacts: Array<{ id?: string; contactName: string; relation?: string; phone: string }>;
   createdAt: string;
   updatedAt: string;
@@ -131,6 +132,13 @@ export default function PublicIdentifyPage({ params }: { params: Promise<{ token
   /* ─── Auto GPS capture on mount ─── */
   useEffect(() => {
     if (!item || gpsStatus !== 'idle') return;
+
+    // If the profile has no active device link (tracker deleted), abort immediately
+    if (item.hasActiveTracker === false) {
+      setGpsStatus('error');
+      return;
+    }
+
     if (typeof navigator === 'undefined' || !navigator.geolocation) {
       setGpsStatus('error');
       // Still send a report without GPS
@@ -230,6 +238,18 @@ export default function PublicIdentifyPage({ params }: { params: Promise<{ token
           </div>
         ) : item ? (
           <div className="space-y-5">
+
+            {/* ── Inactive tracker warning ── */}
+            {item.hasActiveTracker === false && (
+              <section className="rounded-[2rem] border border-red-400/30 bg-red-500/15 p-5 text-center shadow-2xl backdrop-blur sm:p-6">
+                <AlertTriangle className="mx-auto h-10 w-10 text-red-300" />
+                <h2 className="mt-3 text-xl font-black text-red-100">This tracker is inactive or deleted.</h2>
+                <p className="mt-2 text-sm leading-7 text-red-200/80">
+                  The device linked to this profile has been removed by its owner.
+                  Location tracking is no longer active.
+                </p>
+              </section>
+            )}
 
             {/* ── Photo + Name Hero Card ── */}
             <section className="overflow-hidden rounded-[2rem] border border-white/20 bg-white/10 shadow-2xl backdrop-blur">

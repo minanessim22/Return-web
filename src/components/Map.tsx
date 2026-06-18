@@ -16,6 +16,8 @@ export type MarkerPoint = {
   lastSeen?: string;
   /** Optional: true if this marker is receiving live updates */
   live?: boolean;
+  /** Optional: true if this marker represents a passive QR/NFC scan (not a GPS device) */
+  isPassiveScan?: boolean;
 };
 
 const markerIcon = L.divIcon({

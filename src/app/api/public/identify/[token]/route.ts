@@ -9,13 +9,20 @@ export async function GET(_request: Request, context: { params: Promise<{ token:
   const item = await prisma.identificationProfile.findFirst({
     where: { qrPublicToken: token, isActive: true },
     include: {
-      emergencyContacts: true
+      emergencyContacts: true,
+      deviceLinks: {
+        where: { unlinkedAt: null },
+        select: { id: true }
+      }
     }
   });
 
   if (!item) {
     return NextResponse.json({ error: 'Profile not found.' }, { status: 404 });
   }
+
+  // A profile is actively tracked if it has at least one non-unlinked deviceLink
+  const hasActiveTracker = item.deviceLinks.length > 0;
 
   // Format to match expected public profile item structure
   const formatted = {
@@ -34,6 +41,7 @@ export async function GET(_request: Request, context: { params: Promise<{ token:
     qrPublicToken: item.qrPublicToken,
     nfcTagUid: item.nfcTagUid,
     isActive: item.isActive,
+    hasActiveTracker,
     createdAt: item.createdAt.toISOString(),
     updatedAt: item.updatedAt.toISOString(),
     emergencyContacts: item.emergencyContacts.map(c => ({
@@ -45,3 +53,4 @@ export async function GET(_request: Request, context: { params: Promise<{ token:
 
   return NextResponse.json({ item: formatted });
 }
+

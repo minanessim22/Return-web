@@ -22,11 +22,25 @@ export async function POST(request: Request, context: { params: Promise<{ token:
   // Look up the profile by QR public token
   const profile = await prisma.identificationProfile.findFirst({
     where: { qrPublicToken: token, isActive: true },
-    include: { emergencyContacts: true }
+    include: {
+      emergencyContacts: true,
+      deviceLinks: {
+        where: { unlinkedAt: null },
+        select: { id: true }
+      }
+    }
   });
 
   if (!profile) {
     return NextResponse.json({ error: 'Profile not found.' }, { status: 404 });
+  }
+
+  // Abort if the profile has no active device links (tracker was deleted)
+  if (profile.deviceLinks.length === 0) {
+    return NextResponse.json(
+      { error: 'This tracker is inactive or deleted.' },
+      { status: 410 }
+    );
   }
 
   // Create a scan event to log this interaction
