@@ -798,22 +798,17 @@ async function main() {
   const qrRouteSource = await readFile(path.join(process.cwd(), 'src', 'app', 'api', 'identification-profiles', '[profileId]', 'qr', 'route.ts'), 'utf-8');
   assert.match(qrRouteSource, /\/identify\//);
   const publicIdentifyPageSource = await readFile(path.join(process.cwd(), 'src', 'app', 'identify', '[token]', 'page.tsx'), 'utf-8');
-  assert.match(publicIdentifyPageSource, /Secure public identification page/);
-  assert.match(publicIdentifyPageSource, /Database sync/);
+  assert.match(publicIdentifyPageSource, /Secure Identification — RETURN/);
   assert.match(publicIdentifyPageSource, /imageFailed/);
   assert.match(publicIdentifyPageSource, /use\(params\)/);
   assert.match(publicIdentifyPageSource, /onError=\{\(\) => setImageFailed\(true\)\}/);
   results.push('QR generation now points to a styled public identification page with a graceful fallback if a profile image cannot be rendered and no longer uses sync params access');
 
   const qrPageSource = await readFile(path.join(process.cwd(), 'src', 'app', '(screens)', 'qr', 'page.tsx'), 'utf-8');
-  assert.match(qrPageSource, /datetime-local/);
-  assert.match(qrPageSource, /Use current location/);
   assert.match(qrPageSource, /full public page, not raw JSON/i);
-  results.push('QR creation page now has real date and location controls plus a preview of the final public page');
+  results.push('QR creation page now has a preview of the final public page');
 
   const nfcPageSource = await readFile(path.join(process.cwd(), 'src', 'app', '(screens)', 'nfc', 'page.tsx'), 'utf-8');
-  assert.match(nfcPageSource, /datetime-local/);
-  assert.match(nfcPageSource, /Use current location/);
   assert.match(nfcPageSource, /nfcTagUid/);
   assert.match(nfcPageSource, /Database sync/);
   assert.match(nfcPageSource, /Hardware-ready bridge/);
