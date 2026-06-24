@@ -537,7 +537,7 @@ export function DevicesManagementPanel({ isRTL = false }: { isRTL?: boolean }) {
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4 border-b border-white/20 pb-5">
         <div>
-          <h2 className="text-2xl md:text-3xl font-black text-white tracking-tight">{t.heading}</h2>
+          <h2 className="text-xl font-black tracking-tight text-white sm:text-2xl md:text-3xl">{t.heading}</h2>
           <p className="text-white/75 text-sm mt-2 max-w-3xl">{t.subtitle}</p>
         </div>
         <button
@@ -583,7 +583,7 @@ export function DevicesManagementPanel({ isRTL = false }: { isRTL?: boolean }) {
             </div>
             <p className="text-sm text-white/70 mt-2 max-w-3xl">{t.historyBody}</p>
           </div>
-          <label className="space-y-2 text-sm min-w-[240px]">
+          <label className="w-full space-y-2 text-sm sm:min-w-[240px] sm:w-auto">
             <span className="text-white/70">{t.historySelect}</span>
             <select
               value={historyDeviceId}

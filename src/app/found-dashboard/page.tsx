@@ -6,13 +6,14 @@ import { useRouter } from 'next/navigation';
 import {
   FileText, Grid,
   UserCircle, Bell, Monitor, Settings, LogOut,
-  Search, SlidersHorizontal, ImageIcon, Clock, ChevronDown, Save, X
+  Search, SlidersHorizontal, ImageIcon, Clock, ChevronDown, Save, X, Menu
 } from 'lucide-react';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { api } from '@/lib/api';
 import { CaseCollectionSection } from '@/components/dashboard/CaseCollectionSection';
 import { DevicesManagementPanel } from '@/components/dashboard/DevicesManagementPanel';
 import { ProfileSettingsPanel } from '@/components/dashboard/ProfileSettingsPanel';
+import { MobileNavDrawer } from '@/components/dashboard/MobileNavDrawer';
 import { AdminQuickActions } from '@/components/admin/AdminQuickActions';
 import { isAdminUser } from '@/lib/access';
 
@@ -325,8 +326,8 @@ function Toggle({ on, onChange }: { on: boolean; onChange: () => void }) {
 
 function SettingRow({ label, value, onChange }: { label: string; value: boolean; onChange: () => void }) {
   return (
-    <div className="flex items-center justify-between bg-white/15 backdrop-blur-md rounded-xl px-5 py-3 border border-white/20">
-      <span className="text-white/90 text-sm font-medium">{label}</span>
+    <div className="flex flex-col gap-3 rounded-xl border border-white/20 bg-white/15 px-4 py-3 backdrop-blur-md sm:flex-row sm:items-center sm:justify-between sm:px-5">
+      <span className="min-w-0 flex-1 text-sm font-medium text-white/90">{label}</span>
       <Toggle on={value} onChange={onChange} />
     </div>
   );
@@ -347,8 +348,8 @@ function SelectRow({ label, value, options, onChange }: { label: string; value: 
   }, [open]);
 
   return (
-    <div className={`flex items-center justify-between bg-white/15 backdrop-blur-md rounded-xl px-5 py-3 border border-white/20 relative ${open ? 'z-[100]' : 'z-10'}`}>
-      <span className="text-white/90 text-sm font-medium">{label}</span>
+    <div className={`relative flex flex-col gap-3 rounded-xl border border-white/20 bg-white/15 px-4 py-3 backdrop-blur-md sm:flex-row sm:items-center sm:justify-between sm:px-5 ${open ? 'z-[100]' : 'z-10'}`}>
+      <span className="min-w-0 flex-1 text-sm font-medium text-white/90">{label}</span>
       <div className="relative" ref={dropdownRef}>
         <button onClick={() => setOpen(!open)} className="flex items-center gap-1 bg-white/20 border border-white/30 rounded-lg px-3 py-1 text-white text-xs font-semibold hover:bg-white/30 transition-all">
           {value}
@@ -583,16 +584,16 @@ function NotificationsContent({ t, isRTL }: { t: typeof translations['EN']; isRT
 
   return (
     <>
-      <div className="flex justify-between items-center px-2 py-4 border-b border-white/20 mb-6">
-        <h2 className="text-xl md:text-2xl font-extrabold text-white tracking-tight">{t.notifications}</h2>
-        <button onClick={markAllRead} className="bg-[#014CB3] hover:bg-blue-800 text-white text-xs font-bold px-5 py-2 rounded-full transition-all shadow-lg">
+      <div className="mb-6 flex flex-col gap-3 border-b border-white/20 px-2 py-4 sm:flex-row sm:items-center sm:justify-between">
+        <h2 className="text-lg font-extrabold tracking-tight text-white sm:text-xl md:text-2xl">{t.notifications}</h2>
+        <button onClick={markAllRead} className="w-full rounded-full bg-[#014CB3] px-5 py-2 text-xs font-bold text-white shadow-lg transition-all hover:bg-blue-800 sm:w-auto">
           {t.markAllRead}
         </button>
       </div>
-      <div className={`flex items-center gap-0 px-2 pt-1 pb-6 ${isRTL ? 'flex-row-reverse' : ''}`}>
+      <div className={`flex items-center gap-0 overflow-x-auto px-2 pb-6 pt-1 ${isRTL ? 'flex-row-reverse' : ''}`}>
         {tabs.map((tab, i) => (
           <React.Fragment key={tab}>
-            <button onClick={() => setActiveNotificationTab(i)} className={`text-sm font-bold px-1 pb-1 transition-all ${activeNotificationTab === i ? 'text-white border-b-2 border-white' : 'text-white/60 hover:text-white'}`}>
+            <button onClick={() => setActiveNotificationTab(i)} className={`flex-shrink-0 whitespace-nowrap px-1 pb-1 text-xs font-bold transition-all sm:text-sm ${activeNotificationTab === i ? 'text-white border-b-2 border-white' : 'text-white/60 hover:text-white'}`}>
               {tab}
             </button>
             {i < tabs.length - 1 && <span className="text-white/40 mx-3 font-light text-lg">/</span>}
@@ -606,14 +607,14 @@ function NotificationsContent({ t, isRTL }: { t: typeof translations['EN']; isRT
           ))
         ) : filteredItems.length > 0 ? (
           filteredItems.map((item) => (
-            <div key={item.id} className={`bg-white/15 backdrop-blur-md rounded-2xl border shadow-lg px-6 py-4 flex items-center justify-between gap-4 ${item.isRead ? 'border-white/10' : 'border-white/25'}`}>
+            <div key={item.id} className={`flex flex-col gap-4 rounded-2xl border bg-white/15 px-4 py-4 shadow-lg backdrop-blur-md sm:flex-row sm:items-center sm:justify-between sm:px-6 ${item.isRead ? 'border-white/10' : 'border-white/25'}`}>
               <div className="flex-1 min-w-0">
                 <p className="text-white font-bold text-base mb-1">{item.title}</p>
                 <p className="text-white/70 text-sm mb-2">{item.body}</p>
                 <div className="flex items-center gap-1 text-white/50 text-xs"><Clock className="w-3 h-3" /><span>{new Date(item.createdAt).toLocaleString()}</span></div>
               </div>
               {item.actionUrl ? (
-                <button onClick={() => { window.location.href = item.actionUrl; }} className="flex-shrink-0 bg-[#60C10F] hover:bg-[#4da00b] text-white text-xs font-bold px-4 py-2 rounded-full transition-all shadow-md whitespace-nowrap">
+                <button onClick={() => { window.location.href = item.actionUrl; }} className="w-full flex-shrink-0 rounded-full bg-[#60C10F] px-4 py-2.5 text-xs font-bold text-white shadow-md transition-all hover:bg-[#4da00b] sm:w-auto sm:py-2 sm:whitespace-nowrap">
                   Open
                 </button>
               ) : null}
@@ -705,10 +706,10 @@ function SettingsContent({ t, isRTL }: { t: typeof translations['EN']; isRTL: bo
 
   return (
     <>
-      <div className="px-8 py-4 border-b border-white/20">
-        <h1 className="text-xl md:text-2xl font-extrabold text-white tracking-tight italic">{t.settingsTitle}</h1>
+      <div className="border-b border-white/20 px-4 py-4 sm:px-8">
+        <h1 className="text-lg font-extrabold tracking-tight text-white italic sm:text-xl md:text-2xl">{t.settingsTitle}</h1>
       </div>
-      <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-8 overflow-visible">
+      <div className="grid grid-cols-1 gap-6 overflow-visible p-4 sm:gap-8 sm:p-6 md:grid-cols-2">
         <div className="space-y-6 overflow-visible">
           <div className="overflow-visible">
             <h2 className="text-white/80 font-bold text-base mb-3 italic">{t.secNotifications}</h2>
@@ -847,26 +848,26 @@ function OverviewContent({ t, isRTL, flowSteps }: {
   return (
     <>
       <section className="mb-10">
-        <div className="flex justify-between items-center mb-8 border-b border-white/25 pb-4">
-          <h2 className="text-2xl md:text-3xl font-extrabold text-white tracking-tight">{t.myDashboard}</h2>
-          <div className={`flex items-center gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
-             <span className="text-xl md:text-2xl font-medium text-white">{t.hello}</span>
-             <span className="text-xl md:text-2xl font-extrabold text-[#002e6d] drop-shadow-sm">{(user?.name?.split(' ')[0] || 'RETURN').toUpperCase()}</span>
+        <div className="mb-8 flex flex-col gap-4 border-b border-white/25 pb-4 md:flex-row md:items-center md:justify-between">
+          <h2 className="text-2xl font-extrabold tracking-tight text-white md:text-3xl">{t.myDashboard}</h2>
+          <div className={`flex flex-wrap items-center gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
+             <span className="text-xl font-medium text-white md:text-2xl">{t.hello}</span>
+             <span className="text-xl font-extrabold text-[#002e6d] drop-shadow-sm md:text-2xl">{(user?.name?.split(' ')[0] || 'RETURN').toUpperCase()}</span>
           </div>
         </div>
       </section>
 
       <section className="mb-10">
         <h2 className="text-xl md:text-2xl font-bold text-white text-center mb-6">{t.stats}</h2>
-        <div className="flex justify-center gap-6 flex-wrap">
+        <div className="flex flex-wrap justify-center gap-4 sm:gap-6">
           {(loading ? [
             { val: '…', label: t.itemsFound },
             { val: '…', label: t.possibleMatches },
             { val: '…', label: t.notifications },
           ] : stats).map((stat, i) => (
-            <div key={i} className="bg-white/20 backdrop-blur-lg rounded-[2rem] flex flex-col items-center justify-center border border-white/30 shadow-2xl" style={{ width: 'clamp(130px, 15vw, 190px)', height: 'clamp(130px, 15vw, 190px)' }}>
-              <span className="font-black text-white mb-1" style={{ fontSize: 'clamp(3rem, 6vw, 5rem)' }}>{stat.val}</span>
-              <span className="text-xs md:text-sm font-bold text-white uppercase tracking-tight text-center px-2">{stat.label}</span>
+            <div key={i} className="flex min-h-[150px] w-[clamp(130px,15vw,190px)] flex-col items-center justify-center gap-3 rounded-[1.5rem] border border-white/30 bg-white/20 px-3 py-4 shadow-2xl backdrop-blur-lg sm:min-h-[clamp(150px,16vw,200px)] sm:rounded-[2rem] md:gap-4 md:py-5">
+              <span className="block text-4xl font-black leading-none text-white md:text-5xl">{stat.val}</span>
+              <span className="block max-w-full px-1 text-center text-[10px] font-bold uppercase leading-snug tracking-tight text-white md:text-xs">{stat.label}</span>
             </div>
           ))}
         </div>
@@ -880,14 +881,14 @@ function OverviewContent({ t, isRTL, flowSteps }: {
 
       <section className="mb-10">
         <h2 className="text-xl md:text-2xl font-bold text-white text-center mb-6">{t.identifyFoundItem}</h2>
-        <div className="flex justify-center gap-6 flex-wrap">
-          <button onClick={() => router.push('/found-dashboard/scan-qr')} className="px-8 py-5 bg-[#014CB3] text-white rounded-2xl border-b-[6px] border-[#002e6d] active:border-b-0 active:translate-y-1 transition-all shadow-xl flex flex-col items-center min-w-[240px]">
-            <span className="text-lg md:text-xl font-black uppercase tracking-wide">{t.scanQRCode}</span>
-            <span className="text-xs md:text-sm font-medium mt-1">{t.scanQRTag}</span>
+        <div className="flex flex-col items-stretch justify-center gap-4 sm:flex-row sm:flex-wrap sm:gap-6">
+          <button onClick={() => router.push('/found-dashboard/scan-qr')} className="flex w-full max-w-md flex-1 flex-col items-center rounded-2xl border-b-[6px] border-[#002e6d] bg-[#014CB3] px-6 py-4 text-white shadow-xl transition-all active:border-b-0 active:translate-y-1 sm:min-w-[240px] sm:px-8 sm:py-5">
+            <span className="text-base font-black uppercase tracking-wide sm:text-lg md:text-xl">{t.scanQRCode}</span>
+            <span className="mt-1 text-center text-xs font-medium sm:text-sm">{t.scanQRTag}</span>
           </button>
-          <button onClick={() => router.push('/lost-dashboard/nfc')} className="px-8 py-5 bg-[#014CB3] text-white rounded-2xl border-b-[6px] border-[#002e6d] active:border-b-0 active:translate-y-1 transition-all shadow-xl flex flex-col items-center min-w-[240px]">
-            <span className="text-lg md:text-xl font-black uppercase tracking-wide">{t.tapNFCTag}</span>
-            <span className="text-xs md:text-sm font-medium mt-1">{t.holdPhoneNear}</span>
+          <button onClick={() => router.push('/lost-dashboard/nfc')} className="flex w-full max-w-md flex-1 flex-col items-center rounded-2xl border-b-[6px] border-[#002e6d] bg-[#014CB3] px-6 py-4 text-white shadow-xl transition-all active:border-b-0 active:translate-y-1 sm:min-w-[240px] sm:px-8 sm:py-5">
+            <span className="text-base font-black uppercase tracking-wide sm:text-lg md:text-xl">{t.tapNFCTag}</span>
+            <span className="mt-1 text-center text-xs font-medium sm:text-sm">{t.holdPhoneNear}</span>
           </button>
         </div>
       </section>
@@ -903,8 +904,29 @@ function DevicesHeaderContent({ t, isRTL }: { t: typeof translations['EN']; isRT
 export default function DashboardLostPage() {
   const [currentLanguage, setCurrentLanguage] = useState<'EN' | 'AR'>('EN');
   const [activeTab, setActiveTab] = useState<'overview' | 'myReports' | 'matches' | 'notifications' | 'devices' | 'settings' | 'profile' | 'missing' | 'found' | 'devicesHeader'>('overview');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const router = useRouter();
   const { user, logout } = useAuth();
+
+  const closeMobileMenu = () => setMobileMenuOpen(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mq = window.matchMedia('(min-width: 768px)');
+    const handleChange = () => {
+      if (mq.matches) setMobileMenuOpen(false);
+    };
+    mq.addEventListener('change', handleChange);
+    return () => mq.removeEventListener('change', handleChange);
+  }, []);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    document.body.style.overflow = mobileMenuOpen ? 'hidden' : '';
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [mobileMenuOpen]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -970,6 +992,83 @@ export default function DashboardLostPage() {
     { label: t.matched, row: 'top' },
   ];
 
+  const renderSidebarContent = (afterNavigate?: () => void, mobileLayout = false) => (
+    <>
+      <nav className="mt-2 space-y-2">
+        <div
+          onClick={() => {
+            setActiveTab('overview');
+            afterNavigate?.();
+          }}
+          className={`flex cursor-pointer items-center gap-3 px-3 py-2 transition-colors shadow-lg ${
+            activeTab === 'overview'
+              ? isRTL
+                ? 'rounded-r-full border-r-4 border-white bg-white/25'
+                : 'rounded-l-full border-l-4 border-white bg-white/25'
+              : isRTL
+                ? 'rounded-r-full hover:bg-white/10'
+                : 'rounded-l-full hover:bg-white/10'
+          }`}
+        >
+          <Grid className={`h-5 w-5 flex-shrink-0 ${activeTab === 'overview' ? 'text-white' : 'text-white/70'}`} />
+          <span className={`truncate text-sm ${activeTab === 'overview' ? 'font-bold text-white' : 'font-medium text-white/70'}`}>
+            {t.sideMyDashboard}
+          </span>
+        </div>
+
+        {sideItems.map((item) => {
+          const isItemActive =
+            (item.label === t.sideMyReports && activeTab === 'myReports') ||
+            (item.label === t.possibleMatches && activeTab === 'matches') ||
+            (item.label === t.sideNotifications && activeTab === 'notifications') ||
+            (item.label === t.sideDevices && activeTab === 'devices') ||
+            (item.label === t.sideSettings && activeTab === 'settings');
+
+          return (
+            <div
+              key={item.label}
+              onClick={() => {
+                item.onClick();
+                afterNavigate?.();
+              }}
+              className={`group flex cursor-pointer items-center gap-3 px-3 py-2 transition-colors ${
+                isItemActive
+                  ? isRTL
+                    ? 'rounded-r-full border-r-4 border-white bg-white/25 shadow-lg'
+                    : 'rounded-l-full border-l-4 border-white bg-white/25 shadow-lg'
+                  : isRTL
+                    ? 'rounded-r-full hover:bg-white/10'
+                    : 'rounded-l-full hover:bg-white/10'
+              }`}
+            >
+              <span className={`flex-shrink-0 ${isItemActive ? 'text-white' : 'text-white/70 group-hover:text-white'}`}>
+                {item.icon}
+              </span>
+              <span className={`truncate text-sm font-medium ${isItemActive ? 'font-bold text-white' : 'text-white/70 group-hover:text-white'}`}>
+                {item.label}
+              </span>
+            </div>
+          );
+        })}
+      </nav>
+
+      <button
+        onClick={() => {
+          void handleLogout();
+          afterNavigate?.();
+        }}
+        className={`flex items-center gap-2 bg-[#014CB3] px-4 py-2 text-white transition-all hover:bg-blue-800 ${
+          mobileLayout
+            ? 'mt-6 w-full rounded-2xl'
+            : `absolute bottom-0 z-20 ${isRTL ? 'right-0 rounded-tl-2xl' : 'left-0 rounded-tr-2xl'}`
+        }`}
+      >
+        <LogOut className={`h-5 w-5 ${isRTL ? '' : 'rotate-180'}`} />
+        <span className="text-sm font-bold uppercase tracking-wider">{t.sideLogout}</span>
+      </button>
+    </>
+  );
+
   return (
     <div
       className="flex flex-col min-h-screen font-sans select-none"
@@ -977,108 +1076,73 @@ export default function DashboardLostPage() {
       style={{ fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif" }}
     >
       {/* ── TOP NAV ── */}
-      <nav className="h-16 bg-white flex items-center justify-between px-6 z-50 shadow-sm flex-shrink-0">
-        <div className="flex items-center">
+      <nav className="z-50 flex h-16 flex-shrink-0 items-center gap-2 bg-white px-3 shadow-sm md:px-6">
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen(true)}
+            aria-label="Open menu"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full text-gray-700 transition-colors hover:bg-gray-100 md:hidden"
+          >
+            <Menu className="h-6 w-6" />
+          </button>
           <Image src="/photos/8.png" alt="RETURN" width={110} height={36} priority />
         </div>
 
-        {/* تم تحويلها لأزرار عادية (button) بتغير الـ Tab بدلاً من نقلك لصفحة أخرى */}
-        <div className="hidden md:flex items-center gap-8">
-          {navItems.map((item) => {
-            const isActive = activeTab === item.tab;
-            return (
-              <button
-                key={item.label}
-                onClick={() => setActiveTab(item.tab as any)}
-                className={`text-sm font-semibold transition-all pb-1 cursor-pointer ${
-                  isActive
-                    ? 'text-[#60C10F] border-b-2 border-[#60C10F]'
-                    : 'text-gray-500 hover:text-[#60C10F]'
-                }`}
-              >
-                {item.label}
-              </button>
-            );
-          })}
+        <div className="min-w-0 flex-1 overflow-x-auto">
+          <div className="flex min-w-max items-center justify-center gap-4 px-1 md:min-w-0 md:gap-8">
+            {navItems.map((item) => {
+              const isActive = activeTab === item.tab;
+              return (
+                <button
+                  key={item.label}
+                  type="button"
+                  onClick={() => {
+                    setActiveTab(item.tab as typeof activeTab);
+                    closeMobileMenu();
+                  }}
+                  className={`cursor-pointer whitespace-nowrap pb-1 text-xs font-semibold transition-all sm:text-sm ${
+                    isActive
+                      ? 'border-b-2 border-[#60C10F] text-[#60C10F]'
+                      : 'text-gray-500 hover:text-[#60C10F]'
+                  }`}
+                >
+                  {item.label}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex shrink-0 items-center gap-2 md:gap-3">
           <button
             onClick={toggleLanguage}
-            className="text-xs font-bold px-3 py-1 rounded-full border-2 border-[#60C10F] text-[#60C10F] hover:bg-[#60C10F] hover:text-white transition-all"
+            className="rounded-full border-2 border-[#60C10F] px-3 py-1 text-xs font-bold text-[#60C10F] transition-all hover:bg-[#60C10F] hover:text-white"
           >
             {currentLanguage === 'EN' ? 'AR' : 'EN'}
           </button>
-          <UserCircle className="w-10 h-10 text-gray-400 flex-shrink-0" />
-          <span className="text-sm font-extrabold text-gray-800 uppercase tracking-wide whitespace-nowrap">
+          <UserCircle className="h-9 w-9 flex-shrink-0 text-gray-400 md:h-10 md:w-10" />
+          <span className="hidden max-w-[140px] truncate text-sm font-extrabold uppercase tracking-wide text-gray-800 md:inline lg:max-w-none">
             {user?.name?.toUpperCase() || 'RETURN USER'}
           </span>
         </div>
       </nav>
 
       <div className="flex flex-1 overflow-hidden">
-        {/* ── SIDEBAR ── */}
-        <aside className="relative flex-shrink-0 bg-gradient-to-b from-[#014CB3] to-[#60C10F] flex" style={{ width: 'clamp(180px, 16vw, 240px)' }}>
-          <div className="flex-1 flex flex-col py-6 px-2 relative overflow-hidden">
-            <nav className="space-y-2 mt-2">
-              <div
-                onClick={() => setActiveTab('overview')}
-                className={`flex items-center gap-3 px-3 py-2 cursor-pointer transition-colors shadow-lg ${
-                  activeTab === 'overview'
-                    ? isRTL ? 'bg-white/25 border-white border-r-4 rounded-r-full' : 'bg-white/25 border-white border-l-4 rounded-l-full'
-                    : isRTL ? 'hover:bg-white/10 rounded-r-full' : 'hover:bg-white/10 rounded-l-full'
-                }`}
-              >
-                <Grid className={`w-5 h-5 flex-shrink-0 ${activeTab === 'overview' ? 'text-white' : 'text-white/70'}`} />
-                <span className={`text-sm truncate ${activeTab === 'overview' ? 'text-white font-bold' : 'text-white/70 font-medium'}`}>{t.sideMyDashboard}</span>
-              </div>
-              {sideItems.map((item) => (
-                <div
-                  key={item.label}
-                  onClick={item.onClick}
-                  className={`flex items-center gap-3 px-3 py-2 cursor-pointer transition-colors group ${
-                    (item.label === t.sideMyReports && activeTab === 'myReports') ||
-                    (item.label === t.possibleMatches && activeTab === 'matches') ||
-                    (item.label === t.sideNotifications && activeTab === 'notifications') ||
-                    (item.label === t.sideDevices && activeTab === 'devices') ||
-                    (item.label === t.sideSettings && activeTab === 'settings')
-                      ? isRTL ? 'bg-white/25 border-white border-r-4 rounded-r-full shadow-lg' : 'bg-white/25 border-white border-l-4 rounded-l-full shadow-lg'
-                      : isRTL ? 'hover:bg-white/10 rounded-r-full' : 'hover:bg-white/10 rounded-l-full'
-                  }`}
-                >
-                  <span className={`flex-shrink-0 ${
-                    (item.label === t.sideMyReports && activeTab === 'myReports') ||
-                    (item.label === t.possibleMatches && activeTab === 'matches') ||
-                    (item.label === t.sideNotifications && activeTab === 'notifications') ||
-                    (item.label === t.sideDevices && activeTab === 'devices') ||
-                    (item.label === t.sideSettings && activeTab === 'settings')
-                      ? 'text-white' : 'text-white/70 group-hover:text-white'
-                  }`}>{item.icon}</span>
-                  <span className={`font-medium text-sm truncate ${
-                    (item.label === t.sideMyReports && activeTab === 'myReports') ||
-                    (item.label === t.possibleMatches && activeTab === 'matches') ||
-                    (item.label === t.sideNotifications && activeTab === 'notifications') ||
-                    (item.label === t.sideDevices && activeTab === 'devices') ||
-                    (item.label === t.sideSettings && activeTab === 'settings')
-                      ? 'text-white font-bold' : 'text-white/70 group-hover:text-white'
-                  }`}>{item.label}</span>
-                </div>
-              ))}
-            </nav>
-            <button
-              onClick={handleLogout}
-              className={`absolute bottom-0 bg-[#014CB3] text-white px-4 py-2 flex items-center gap-2 hover:bg-blue-800 transition-all z-20 ${
-                isRTL ? 'right-0 rounded-tl-2xl' : 'left-0 rounded-tr-2xl'
-              }`}
-            >
-              <LogOut className={`w-5 h-5 ${isRTL ? '' : 'rotate-180'}`} />
-              <span className="font-bold text-sm uppercase tracking-wider">{t.sideLogout}</span>
-            </button>
+        <aside
+          className="relative hidden flex-shrink-0 bg-gradient-to-b from-[#014CB3] to-[#60C10F] md:flex"
+          style={{ width: 'clamp(180px, 16vw, 240px)' }}
+        >
+          <div className="relative flex flex-1 flex-col overflow-hidden px-2 py-6">
+            {renderSidebarContent()}
           </div>
         </aside>
 
-        {/* ── MAIN ── */}
-        <main className={`flex-1 p-6 md:p-10 overflow-y-auto ${
+        <MobileNavDrawer open={mobileMenuOpen} onClose={closeMobileMenu} isRTL={isRTL}>
+          <div className="px-3 py-4">{renderSidebarContent(closeMobileMenu, true)}</div>
+        </MobileNavDrawer>
+
+        <main className={`flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-6 lg:p-10 ${
           activeTab === 'profile'
             ? 'bg-gradient-to-br from-[#60C10F]/60 to-[#014CB3]/60'
             : 'bg-gradient-to-br from-[#014CB3] to-[#60C10F]'

@@ -343,23 +343,23 @@ export const UnifiedAuthScreen: React.FC<UnifiedAuthScreenProps> = ({ mode = 'lo
           </div>
         </div>
 
-        <div className="flex flex-1 items-center justify-center p-6 lg:p-12">
-          <div className="relative w-full max-w-md rounded-3xl bg-gradient-to-b from-sky-50 to-emerald-50 p-8 shadow-2xl lg:p-10">
-            <div className="absolute right-6 top-6">
-              <Logo width={120} height={40} />
+        <div className="flex flex-1 items-center justify-center p-4 sm:p-6 lg:p-12">
+          <div className="relative w-full max-w-md rounded-3xl bg-gradient-to-b from-sky-50 to-emerald-50 p-5 shadow-2xl sm:p-8 lg:p-10">
+            <div className="absolute end-4 top-4 sm:end-6 sm:top-6">
+              <Logo width={100} height={33} />
             </div>
 
-            <div className="mb-8 mt-12 flex justify-center">
+            <div className="mb-6 mt-10 flex justify-center sm:mb-8 sm:mt-12">
               <div className="relative flex rounded-full bg-green-500 p-1">
                 <button
                   onClick={() => toggleAuthTab('login')}
-                  className={`rounded-full px-6 py-3 text-sm font-semibold transition-all duration-300 ${activeTab === 'login' ? 'bg-blue-500 text-white shadow-lg' : 'text-white hover:text-gray-100'}`}
+                  className={`rounded-full px-4 py-2.5 text-xs font-semibold transition-all duration-300 sm:px-6 sm:py-3 sm:text-sm ${activeTab === 'login' ? 'bg-blue-500 text-white shadow-lg' : 'text-white hover:text-gray-100'}`}
                 >
                   {t.login}
                 </button>
                 <button
                   onClick={() => toggleAuthTab('signin')}
-                  className={`rounded-full px-6 py-3 text-sm font-semibold transition-all duration-300 ${activeTab === 'signin' ? 'bg-blue-500 text-white shadow-lg' : 'text-white hover:text-gray-100'}`}
+                  className={`rounded-full px-4 py-2.5 text-xs font-semibold transition-all duration-300 sm:px-6 sm:py-3 sm:text-sm ${activeTab === 'signin' ? 'bg-blue-500 text-white shadow-lg' : 'text-white hover:text-gray-100'}`}
                 >
                   {t.signIn}
                 </button>
@@ -369,7 +369,7 @@ export const UnifiedAuthScreen: React.FC<UnifiedAuthScreenProps> = ({ mode = 'lo
             {success ? <div className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{success}</div> : null}
             {error ? <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div> : null}
 
-            <form onSubmit={handleSubmit} className="space-y-5">
+            <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5">
               {activeTab === 'login' ? (
                 forgotOpen ? (
                   <>
@@ -455,7 +455,7 @@ export const UnifiedAuthScreen: React.FC<UnifiedAuthScreenProps> = ({ mode = 'lo
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between pt-2">
+                    <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:items-center sm:justify-between">
                       <label className="flex cursor-pointer items-center">
                         <div className="relative">
                           <input type="checkbox" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} className="sr-only" />
@@ -463,9 +463,9 @@ export const UnifiedAuthScreen: React.FC<UnifiedAuthScreenProps> = ({ mode = 'lo
                             {rememberMe && <Check className="absolute left-0.5 top-0.5 h-3 w-3 text-white" />}
                           </div>
                         </div>
-                        <span className="ml-2 text-sm text-gray-600">{t.rememberMe}</span>
+                        <span className="ms-2 text-sm text-gray-600">{t.rememberMe}</span>
                       </label>
-                      <button type="button" onClick={() => { setForgotOpen(true); setForgotStep('request'); setForgotEmail(formData.username || formData.email); resetMessages(); }} className="text-sm font-semibold text-blue-600 hover:text-blue-700">
+                      <button type="button" onClick={() => { setForgotOpen(true); setForgotStep('request'); setForgotEmail(formData.username || formData.email); resetMessages(); }} className="text-start text-sm font-semibold text-blue-600 hover:text-blue-700 sm:text-end">
                         {t.forgotPassword}
                       </button>
                     </div>

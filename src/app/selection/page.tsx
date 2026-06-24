@@ -45,8 +45,8 @@ export default function SelectionPage() {
 
   return (
     <div className="w-full min-h-screen bg-white font-inter" dir={isRTL ? 'rtl' : 'ltr'}>
-      <div className="absolute top-8 left-1/2 z-10 -translate-x-1/2 transform">
-        <Image src="/photos/8.png" alt="Return Logo" width={150} height={50} className="object-contain" />
+      <div className="absolute top-6 left-1/2 z-10 -translate-x-1/2 transform sm:top-8">
+        <Image src="/photos/8.png" alt="Return Logo" width={150} height={50} className="h-auto w-28 object-contain sm:w-[150px]" />
       </div>
 
       <div className="flex min-h-screen flex-col lg:flex-row">
@@ -63,33 +63,33 @@ export default function SelectionPage() {
           </div>
         </div>
 
-        <div className="flex w-full items-center justify-center p-6 pt-32 lg:w-1/2 lg:p-12 lg:pt-12">
-          <div className="w-full max-w-2xl rounded-3xl bg-gradient-to-b from-blue-100 to-green-100 p-8 text-center shadow-2xl md:p-12 lg:p-16">
+        <div className="flex w-full items-center justify-center p-4 pt-24 sm:p-6 sm:pt-32 lg:w-1/2 lg:p-12 lg:pt-12">
+          <div className="w-full max-w-2xl rounded-3xl bg-gradient-to-b from-blue-100 to-green-100 p-5 text-center shadow-2xl sm:p-8 md:p-12 lg:p-16">
             {isAdminUser(user) ? (
-              <div className="mb-8 text-left">
+              <div className="mb-6 text-left sm:mb-8">
                 <AdminQuickActions locale={currentLanguage} compact />
               </div>
             ) : null}
 
-            <div className="mb-12 mt-2 lg:mt-8">
-              <h1 className="text-3xl font-bold leading-relaxed md:text-4xl">
+            <div className="mb-8 mt-2 sm:mb-12 lg:mt-8">
+              <h1 className="text-2xl font-bold leading-relaxed sm:text-3xl md:text-4xl">
                 <span className="font-medium text-black">{t.textBefore} </span>
                 <span className="font-black text-green-600">RETURN</span>
                 <span className="font-medium text-black"> {t.textAfter}</span>
               </h1>
             </div>
 
-            <div className="flex flex-col gap-5 md:flex-row md:gap-6">
+            <div className="flex flex-col gap-4 sm:flex-row sm:gap-5 md:gap-6">
               <button
                 onClick={() => handleSelection('lost')}
-                className="flex-1 rounded-xl bg-blue-500 px-6 py-4 text-base font-bold text-white transition-colors hover:bg-blue-600"
+                className="flex-1 rounded-xl bg-blue-500 px-4 py-3.5 text-sm font-bold text-white transition-colors hover:bg-blue-600 sm:px-6 sm:py-4 sm:text-base"
               >
                 {t.lostButton}
               </button>
 
               <button
                 onClick={() => handleSelection('found')}
-                className="flex-1 rounded-xl bg-green-500 px-6 py-4 text-base font-bold text-white transition-colors hover:bg-green-600"
+                className="flex-1 rounded-xl bg-green-500 px-4 py-3.5 text-sm font-bold text-white transition-colors hover:bg-green-600 sm:px-6 sm:py-4 sm:text-base"
               >
                 {t.foundButton}
               </button>

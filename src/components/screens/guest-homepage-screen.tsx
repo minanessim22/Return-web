@@ -347,11 +347,11 @@ export function GuestHomepageScreen() {
     <div className="w-full min-h-screen bg-white overflow-x-hidden font-sans" dir={currentLanguage === 'AR' ? 'rtl' : 'ltr'}>
 
       {/* 1. Header (Navbar) */}
-      <header className="sticky top-0 z-50 bg-white border-b border-gray-100 w-full shadow-sm">
-        <div className="max-w-[1440px] mx-auto px-6 lg:px-12 flex items-center justify-between h-20">
+      <header className="sticky top-0 z-50 w-full border-b border-gray-100 bg-white shadow-sm">
+        <div className="mx-auto flex h-16 max-w-[1440px] items-center justify-between gap-2 px-4 sm:h-20 sm:gap-4 sm:px-6 lg:px-12">
           {/* Logo */}
-          <div className="flex items-center">
-            <Logo width={140} height={45} />
+          <div className="flex shrink-0 items-center">
+            <Logo width={110} height={36} />
           </div>
 
           {/* Navigation Links */}
@@ -364,16 +364,16 @@ export function GuestHomepageScreen() {
           </nav>
 
           {/* Auth Buttons */}
-          <div className="flex items-center gap-4">
+          <div className="flex shrink-0 items-center gap-2 sm:gap-4">
             <Button
               variant="outline"
-              className="border-[#014CB3] text-[#014CB3] hover:bg-[#014CB3] hover:text-white px-8 h-12 rounded-xl text-lg font-bold"
+              className="h-10 rounded-xl border-[#014CB3] px-3 text-sm font-bold text-[#014CB3] hover:bg-[#014CB3] hover:text-white sm:h-12 sm:px-6 sm:text-base md:px-8 md:text-lg"
               onClick={() => router.push('/login')}
             >
               {t.login}
             </Button>
             <Button
-              className="bg-[#60C10F] hover:bg-[#60C10F]/90 text-white px-8 h-12 rounded-xl text-lg font-bold shadow-lg"
+              className="h-10 rounded-xl bg-[#60C10F] px-3 text-sm font-bold text-white shadow-lg hover:bg-[#60C10F]/90 sm:h-12 sm:px-6 sm:text-base md:px-8 md:text-lg"
               onClick={() => router.push('/sign-in')}
             >
               {t.signUp}
@@ -383,25 +383,25 @@ export function GuestHomepageScreen() {
       </header>
 
       {/* 2. Hero Section with Slider */}
-      <section id="home" className="w-full py-12 lg:py-20 bg-white relative overflow-hidden">
-        <div className="max-w-[1440px] mx-auto px-6 lg:px-12">
+      <section id="home" className="relative w-full overflow-hidden bg-white py-8 sm:py-12 lg:py-20">
+        <div className="relative mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-12">
 
           {/* Navigation Arrows */}
           <button
             onClick={prevSlide}
-            className="absolute left-4 top-1/2 transform -translate-y-1/2 z-10 w-12 h-12 bg-white/80 rounded-full flex items-center justify-center shadow-lg hover:bg-white transition-colors"
+            className="absolute left-1 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 transform items-center justify-center rounded-full bg-white/80 text-xl shadow-lg transition-colors hover:bg-white sm:left-4 sm:h-12 sm:w-12 sm:text-2xl"
           >
             ‹
           </button>
           <button
             onClick={nextSlide}
-            className="absolute right-4 top-1/2 transform -translate-y-1/2 z-10 w-12 h-12 bg-white/80 rounded-full flex items-center justify-center shadow-lg hover:bg-white transition-colors"
+            className="absolute right-1 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 transform items-center justify-center rounded-full bg-white/80 text-xl shadow-lg transition-colors hover:bg-white sm:right-4 sm:h-12 sm:w-12 sm:text-2xl"
           >
             ›
           </button>
 
           {/* Slides */}
-          <div className="relative h-[600px] lg:h-[500px]">
+          <div className="relative min-h-[520px] sm:min-h-[560px] lg:h-[500px]">
             <AnimatePresence mode="wait">
               <motion.div
                 key={currentSlide}
@@ -409,18 +409,18 @@ export function GuestHomepageScreen() {
                 animate={{ x: 0, opacity: 1 }}
                 exit={{ x: -300, opacity: 0 }}
                 transition={{ duration: 0.5, ease: "easeInOut" }}
-                className="absolute inset-0 grid lg:grid-cols-2 gap-10 items-center"
+                className="absolute inset-0 grid items-center gap-6 px-8 sm:gap-8 sm:px-10 lg:grid-cols-2 lg:gap-10 lg:px-0"
               >
                 {/* Text Content */}
-                <div className="space-y-6 z-10">
-                  <h1 className="text-5xl lg:text-6xl xl:text-7xl font-black leading-[1.1] tracking-tight mb-6">
+                <div className="z-10 order-2 space-y-4 sm:space-y-6 lg:order-1">
+                  <h1 className="mb-4 text-3xl font-black leading-[1.1] tracking-tight sm:mb-6 sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl">
                     {heroSlides[currentSlide].title}
                   </h1>
-                  <p className="text-xl lg:text-2xl text-gray-600 max-w-xl font-semibold leading-relaxed mb-8">
+                  <p className="mb-6 max-w-xl text-base font-semibold leading-relaxed text-gray-600 sm:mb-8 sm:text-lg md:text-xl lg:text-2xl">
                     {heroSlides[currentSlide].description}
                   </p>
                   <Button
-                    className="h-16 px-12 text-xl font-black rounded-2xl shadow-2xl uppercase text-white hover:scale-105 transition-all duration-300 border-0"
+                    className="h-12 w-full rounded-2xl border-0 px-6 text-base font-black uppercase text-white shadow-2xl transition-all duration-300 hover:scale-105 sm:h-14 sm:w-auto sm:px-10 sm:text-lg md:h-16 md:px-12 md:text-xl"
                     style={{
                       backgroundColor: heroSlides[currentSlide].buttonColor,
                       color: 'white',
@@ -433,13 +433,13 @@ export function GuestHomepageScreen() {
                 </div>
 
                 {/* Hero Illustration */}
-                <div className="relative flex justify-center">
+                <div className="relative order-1 flex justify-center lg:order-2">
                   <Image
                     src={heroSlides[currentSlide].image}
                     alt="Hero Illustration"
                     width={750}
                     height={600}
-                    className="w-full h-auto object-contain"
+                    className="h-auto w-full max-w-[280px] object-contain sm:max-w-md lg:max-w-none"
                     priority
                   />
                 </div>
@@ -463,10 +463,10 @@ export function GuestHomepageScreen() {
       </section>
 
       {/* 3. Key Features Section */}
-      <section className="w-full py-16 bg-white">
-        <div className="max-w-[1440px] mx-auto px-6 lg:px-12">
-          <h2 className="text-4xl font-black text-[#58595D] mb-12">{t.keyFeatures}</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10">
+      <section className="w-full py-10 sm:py-16 bg-white">
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-12">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-black text-[#58595D] mb-8 sm:mb-12">{t.keyFeatures}</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 sm:gap-10">
             <FeatureItem img="14.png" title={t.aiSearch} />
             <FeatureItem img="10.png" title={t.qrNfc} />
             <FeatureItem img="7.png" title={t.geoAlerts} />
@@ -476,10 +476,10 @@ export function GuestHomepageScreen() {
       </section>
 
       {/* 4. Categories We Support Section */}
-      <section id="categories" className="w-full py-16 bg-white">
-        <div className="max-w-[1440px] mx-auto px-6 lg:px-12">
-          <h2 className="text-4xl font-black text-[#58595D] mb-2">{t.categoriesWeSupport}</h2>
-          <p className="text-lg text-gray-500 font-bold mb-10">{t.categoriesSubtitle.replace('{returnName}', t.returnName)}</p>
+      <section id="categories" className="w-full py-10 sm:py-16 bg-white">
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-12">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-black text-[#58595D] mb-2">{t.categoriesWeSupport}</h2>
+          <p className="text-base sm:text-lg text-gray-500 font-bold mb-8 sm:mb-10">{t.categoriesSubtitle.replace('{returnName}', t.returnName)}</p>
 
           <div className="flex justify-center">
             <Image
@@ -494,29 +494,29 @@ export function GuestHomepageScreen() {
       </section>
 
       {/* 5. Real Impact Section */}
-      <section id="impacts" className="w-full py-16 bg-[#F3F4F6]">
-        <div className="max-w-[1440px] mx-auto px-6 lg:px-12">
-           <h2 className="text-4xl font-black text-[#58595D] mb-12">{t.realImpact}</h2>
-           <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-              <div className="grid grid-cols-2 gap-4">
+      <section id="impacts" className="w-full py-10 sm:py-16 bg-[#F3F4F6]">
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-12">
+           <h2 className="text-2xl sm:text-3xl md:text-4xl font-black text-[#58595D] mb-8 sm:mb-12">{t.realImpact}</h2>
+           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 sm:gap-10">
+              <div className="grid grid-cols-2 gap-3 sm:gap-4">
                  <StatCard value="3X" label={t.fasterIdentification} color="#014CB3" />
                  <StatCard value="5KM" label={t.instantGeoAlerts} color="#60C10F" />
                  <StatCard value="+40%" label={t.betterVerification} color="#014CB3" />
                  <StatCard value="100%" label={t.saferPrivacyFlow} color="#60C10F" />
               </div>
-              <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
-                 <div className="flex justify-between text-2xl font-black mb-8 px-4">
+              <div className="bg-white p-5 sm:p-8 rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+                 <div className="flex flex-col gap-3 sm:flex-row sm:justify-between text-lg sm:text-2xl font-black mb-6 sm:mb-8 px-1 sm:px-4">
                     <span>{t.before}</span>
-                    <span>{t.after}(<span style={{color: "#014CB3"}}>{t.returnName}</span>)</span>
+                    <span className="break-words">{t.after}(<span style={{color: "#014CB3"}}>{t.returnName}</span>)</span>
                  </div>
-                 <div className="flex justify-between items-start px-4">
-                    <ul className="space-y-4 text-gray-500 font-bold text-lg">
+                 <div className="flex flex-col gap-6 sm:flex-row sm:justify-between sm:items-start px-1 sm:px-4">
+                    <ul className="space-y-3 sm:space-y-4 text-gray-500 font-bold text-sm sm:text-lg">
                        <li>{t.manualPosts}</li>
                        <li>{t.slowVerification}</li>
                        <li>{t.noNearbyAlerts}</li>
                        <li>{t.privacyRisk}</li>
                     </ul>
-                    <ul className="space-y-4 text-gray-700 font-bold text-lg text-right">
+                    <ul className="space-y-3 sm:space-y-4 text-gray-700 font-bold text-sm sm:text-lg sm:text-right">
                        <li>{t.aiMatchScan}</li>
                        <li>{t.instantAlerts}</li>
                        <li>{t.secureHandover}</li>
@@ -529,14 +529,14 @@ export function GuestHomepageScreen() {
       </section>
 
       {/* 6. How It Works Section */}
-      <section id="how-it-works" className="w-full py-20 bg-white">
-        <div className="max-w-[1440px] mx-auto px-6 lg:px-12">
-          <h2 className="text-4xl font-black text-[#58595D] mb-16 text-center">{t.howItWorks}</h2>
+      <section id="how-it-works" className="w-full py-12 sm:py-20 bg-white">
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-12">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-black text-[#58595D] mb-10 sm:mb-16 text-center">{t.howItWorks}</h2>
 
-          <div className="grid lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 max-w-6xl mx-auto">
             {/* Step 1 Card */}
-            <div className="bg-[#87CEEB] rounded-[32px] p-8 text-center text-white">
-              <h3 className="text-2xl font-black mb-6 text-[#014CB3]">{t.step1Title}</h3>
+            <div className="bg-[#87CEEB] rounded-[24px] sm:rounded-[32px] p-6 sm:p-8 text-center text-white">
+              <h3 className="text-xl sm:text-2xl font-black mb-4 sm:mb-6 text-[#014CB3]">{t.step1Title}</h3>
               <div className="mb-6 flex justify-center">
                 <Image
                   src="/photos/4.png"
@@ -546,14 +546,14 @@ export function GuestHomepageScreen() {
                   className="object-contain rounded-xl"
                 />
               </div>
-              <p className="text-lg font-semibold leading-relaxed text-gray-700">
+              <p className="text-base sm:text-lg font-semibold leading-relaxed text-gray-700">
                 {t.step1Description}
               </p>
             </div>
 
             {/* Step 2 Card */}
-            <div className="bg-[#90EE90] rounded-[32px] p-8 text-center text-white">
-              <h3 className="text-2xl font-black mb-6 text-[#2F7D32]">{t.step2Title}</h3>
+            <div className="bg-[#90EE90] rounded-[24px] sm:rounded-[32px] p-6 sm:p-8 text-center text-white">
+              <h3 className="text-xl sm:text-2xl font-black mb-4 sm:mb-6 text-[#2F7D32]">{t.step2Title}</h3>
               <div className="mb-6 flex justify-center">
                 <Image
                   src="/photos/3.png"
@@ -563,14 +563,14 @@ export function GuestHomepageScreen() {
                   className="object-contain rounded-xl"
                 />
               </div>
-              <p className="text-lg font-semibold leading-relaxed text-gray-700">
+              <p className="text-base sm:text-lg font-semibold leading-relaxed text-gray-700">
                 {t.step2Description}
               </p>
             </div>
 
             {/* Step 3 Card */}
-            <div className="bg-[#87CEEB] rounded-[32px] p-8 text-center text-white">
-              <h3 className="text-2xl font-black mb-6 text-[#014CB3]">{t.step3Title}</h3>
+            <div className="bg-[#87CEEB] rounded-[24px] sm:rounded-[32px] p-6 sm:p-8 text-center text-white md:col-span-2 lg:col-span-1">
+              <h3 className="text-xl sm:text-2xl font-black mb-4 sm:mb-6 text-[#014CB3]">{t.step3Title}</h3>
               <div className="mb-6 flex justify-center">
                 <Image
                   src="/photos/13.png"
@@ -580,7 +580,7 @@ export function GuestHomepageScreen() {
                   className="object-contain rounded-xl"
                 />
               </div>
-              <p className="text-lg font-semibold leading-relaxed text-gray-700">
+              <p className="text-base sm:text-lg font-semibold leading-relaxed text-gray-700">
                 {t.step3Description}
               </p>
             </div>
@@ -589,28 +589,28 @@ export function GuestHomepageScreen() {
       </section>
 
       {/* 7. About Section */}
-      <section id="about" className="w-full py-20 bg-white">
-         <div className="max-w-[1440px] mx-auto px-6 lg:px-12">
-            <h2 className="text-4xl font-black text-[#58595D] mb-8">{t.about}</h2>
-            <div className="max-w-4xl mx-auto space-y-8 text-center">
-               <p className="text-2xl leading-relaxed font-bold text-gray-800">
+      <section id="about" className="w-full py-12 sm:py-20 bg-white">
+         <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-12">
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-black text-[#58595D] mb-6 sm:mb-8">{t.about}</h2>
+            <div className="max-w-4xl mx-auto space-y-6 sm:space-y-8 text-center">
+               <p className="text-lg sm:text-xl md:text-2xl leading-relaxed font-bold text-gray-800">
                  <span className="text-[#014CB3] font-black">{t.returnName}</span> {t.aboutDescription1} <span className="text-[#60C10F]">{t.aboutPeople}</span>{currentLanguage === 'AR' ? '، ' : ', '}<span className="text-[#60C10F]">{t.aboutVehicles}</span>{currentLanguage === 'AR' ? '، ' : ', '}<span className="text-[#60C10F]">{t.aboutPets}</span>{currentLanguage === 'AR' ? '، و' : ', and '} <span className="text-[#60C10F]">{t.aboutBelongings}</span> {t.aboutDescription2}
                </p>
-               <p className="text-xl font-bold text-gray-700 leading-relaxed">
+               <p className="text-base sm:text-lg md:text-xl font-bold text-gray-700 leading-relaxed">
                  {t.aboutDescription3}
                </p>
-               <p className="text-lg text-gray-500 font-medium leading-relaxed">
+               <p className="text-sm sm:text-base md:text-lg text-gray-500 font-medium leading-relaxed">
                  {t.aboutDescription4}
                </p>
-               <div className="flex gap-6 justify-center">
+               <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 justify-center px-2">
                   <Button
-                    className="bg-[#014CB3] hover:bg-[#014CB3]/90 h-14 px-10 text-lg font-black rounded-2xl shadow-lg text-white"
+                    className="bg-[#014CB3] hover:bg-[#014CB3]/90 h-12 sm:h-14 w-full sm:w-auto px-8 sm:px-10 text-base sm:text-lg font-black rounded-2xl shadow-lg text-white"
                     onClick={() => router.push('/sign-in')}
                   >
                     {t.reportMissing}
                   </Button>
                   <Button
-                    className="bg-[#60C10F] hover:bg-[#60C10F]/90 h-14 px-10 text-lg font-black rounded-2xl shadow-lg text-white"
+                    className="bg-[#60C10F] hover:bg-[#60C10F]/90 h-12 sm:h-14 w-full sm:w-auto px-8 sm:px-10 text-base sm:text-lg font-black rounded-2xl shadow-lg text-white"
                     onClick={() => router.push('/sign-in')}
                   >
                     {t.iFoundSomeone}
@@ -621,9 +621,9 @@ export function GuestHomepageScreen() {
       </section>
 
       {/* Footer */}
-      <footer className="w-full pt-16" style={{ background: `linear-gradient(to right, ${brandBlue}, ${brandGreen})` }}>
-        <div className="max-w-[1440px] mx-auto px-6 lg:px-12 pb-12">
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-12">
+      <footer className="w-full pt-10 sm:pt-16" style={{ background: `linear-gradient(to right, ${brandBlue}, ${brandGreen})` }}>
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-12 pb-8 sm:pb-12">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-8 sm:gap-12">
             {/* Logo and Copyright */}
             <div className="lg:col-span-1 space-y-6">
               <Logo width={140} height={45} invert />
@@ -740,10 +740,10 @@ export function GuestHomepageScreen() {
 function FeatureItem({ img, title }: { img: string, title: string }) {
   return (
     <div className="flex flex-col items-center text-center group cursor-pointer">
-      <div className="w-56 h-56 mb-6 flex items-center justify-center bg-white rounded-[40px] shadow-[0_10px_40px_rgba(0,0,0,0.08)] group-hover:shadow-xl transition-all duration-300">
-        <Image src={`/photos/${img}`} alt={title} width={160} height={160} className="object-contain" />
+      <div className="w-36 h-36 sm:w-48 sm:h-48 md:w-56 md:h-56 mb-4 sm:mb-6 flex items-center justify-center bg-white rounded-[32px] sm:rounded-[40px] shadow-[0_10px_40px_rgba(0,0,0,0.08)] group-hover:shadow-xl transition-all duration-300">
+        <Image src={`/photos/${img}`} alt={title} width={160} height={160} className="h-auto w-24 sm:w-32 md:w-40 object-contain" />
       </div>
-      <h3 className="text-2xl font-black text-[#58595D]">{title}</h3>
+      <h3 className="text-lg sm:text-xl md:text-2xl font-black text-[#58595D] px-2">{title}</h3>
     </div>
   );
 }
@@ -751,9 +751,9 @@ function FeatureItem({ img, title }: { img: string, title: string }) {
 /** Stat Card Component */
 function StatCard({ value, label, color }: { value: string, label: string, color: string }) {
   return (
-    <div className="rounded-[24px] p-6 text-white flex flex-col items-center justify-center text-center hover:scale-105 transition-transform" style={{ backgroundColor: color }}>
-       <span className="text-3xl font-black mb-1">{value}</span>
-       <span className="text-sm font-bold opacity-90">{label}</span>
+    <div className="rounded-[20px] sm:rounded-[24px] p-4 sm:p-6 text-white flex flex-col items-center justify-center text-center hover:scale-105 transition-transform min-h-[100px]" style={{ backgroundColor: color }}>
+       <span className="text-2xl sm:text-3xl font-black mb-1">{value}</span>
+       <span className="text-xs sm:text-sm font-bold opacity-90 leading-snug">{label}</span>
     </div>
   );
 }

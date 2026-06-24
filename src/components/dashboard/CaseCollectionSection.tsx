@@ -147,7 +147,7 @@ function CaseCard({
           )}
         </div>
 
-        <div className="p-6 text-white flex flex-col">
+        <div className="p-4 text-white flex flex-col sm:p-6">
           <div className="flex flex-wrap items-center gap-2 mb-3">
             {showTypeBadge ? (
               <Badge className="px-3 py-1 rounded-full bg-white/15 border border-white/25 text-xs font-black tracking-[0.2em] uppercase text-white">
@@ -165,7 +165,7 @@ function CaseCard({
             ) : null}
           </div>
 
-          <h3 className="text-2xl font-black tracking-tight mb-3">{displayName}</h3>
+          <h3 className="mb-3 text-xl font-black tracking-tight sm:text-2xl">{displayName}</h3>
           {bestMatch ? (
             <div className="mb-4 rounded-2xl border border-[#c9f0a2] bg-[#60C10F]/15 px-4 py-3">
               <p className="text-[11px] uppercase tracking-[0.25em] text-[#dff7c3] mb-1">Best match</p>
@@ -205,10 +205,10 @@ function CaseCard({
           </div>
           <p className="text-[11px] text-white/70 mb-5">Updated: {formatWhen(report)}</p>
 
-          <div className="mt-auto flex flex-wrap gap-3">
+          <div className="mt-auto flex flex-col gap-3 sm:flex-row sm:flex-wrap">
             <button
               onClick={() => navigateToCase(report)}
-              className="flex-1 min-w-[180px] py-3 bg-white/20 hover:bg-white/35 text-white font-bold rounded-full border border-white/40 transition-all"
+              className="w-full py-3 bg-white/20 hover:bg-white/35 text-white font-bold rounded-full border border-white/40 transition-all sm:flex-1 sm:min-w-[180px]"
             >
               {labels.view}
             </button>
@@ -371,27 +371,29 @@ export function CaseCollectionSection({
 
   return (
     <>
-      <div className="flex justify-between items-start px-2 py-4 border-b border-white/20 mb-6 gap-4 flex-wrap">
-        <div>
-          <h2 className="text-xl md:text-2xl font-extrabold text-white tracking-tight">{title}</h2>
-          {description ? <p className="text-white/75 text-sm mt-2 max-w-2xl">{description}</p> : null}
+      <div className="mb-6 flex flex-col gap-4 border-b border-white/20 px-2 py-4 md:flex-row md:items-start md:justify-between md:gap-6">
+        <div className="min-w-0 md:max-w-md lg:max-w-lg">
+          <h2 className="text-xl font-extrabold tracking-tight text-white md:text-2xl">{title}</h2>
+          {description ? <p className="mt-2 max-w-2xl text-sm text-white/75">{description}</p> : null}
         </div>
 
-        <div className={`flex items-center gap-3 flex-wrap ${isRTL ? 'md:flex-row-reverse' : ''}`}>
-          <div className="flex items-center bg-white/20 backdrop-blur-md border border-white/30 rounded-full px-4 py-1.5 gap-2">
-            <Search className="w-4 h-4 text-white/70" />
+        <div
+          className={`flex w-full min-w-0 flex-col flex-wrap items-stretch gap-3 sm:flex-row sm:items-center sm:flex-wrap md:flex md:flex-1 md:flex-row md:items-center md:flex-wrap md:justify-end md:gap-3 ${isRTL ? 'md:flex-row-reverse' : ''}`}
+        >
+          <div className="flex w-full min-w-0 shrink-0 items-center gap-2 rounded-full border border-white/30 bg-white/20 px-4 py-1.5 backdrop-blur-md sm:w-auto sm:min-w-[220px] md:min-w-[200px] lg:min-w-[240px]">
+            <Search className="h-4 w-4 flex-shrink-0 text-white/70" />
             <input
               type="text"
               value={searchValue}
               onChange={(event) => setSearchValue(event.target.value)}
               placeholder={labels.explore}
-              className="bg-transparent text-white placeholder-white/60 text-sm outline-none w-40"
+              className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/60"
             />
           </div>
 
-          <div className="flex items-center gap-2 rounded-full border border-white/30 bg-white/20 px-3 py-1.5 text-white/90">
-            <Filter className="w-4 h-4" />
-            <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} className="bg-transparent text-sm outline-none">
+          <div className="flex w-full shrink-0 items-center gap-2 rounded-full border border-white/30 bg-white/20 px-3 py-1.5 text-white/90 sm:w-auto">
+            <Filter className="h-4 w-4 shrink-0" />
+            <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} className="min-w-0 bg-transparent text-sm outline-none">
               <option value="ALL" className="text-black">All categories</option>
               {categoryOptions.map((value) => (
                 <option key={value} value={value} className="text-black">{value}</option>
@@ -399,8 +401,8 @@ export function CaseCollectionSection({
             </select>
           </div>
 
-          <div className="rounded-full border border-white/30 bg-white/20 px-3 py-1.5 text-white/90">
-            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="bg-transparent text-sm outline-none">
+          <div className="w-full shrink-0 rounded-full border border-white/30 bg-white/20 px-3 py-1.5 text-white/90 sm:w-auto">
+            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="w-full min-w-0 bg-transparent text-sm outline-none sm:w-auto">
               <option value="ALL" className="text-black">All statuses</option>
               {statusOptions.map((value) => (
                 <option key={value} value={value} className="text-black">{value}</option>
@@ -408,24 +410,24 @@ export function CaseCollectionSection({
             </select>
           </div>
 
-          <div className="rounded-full border border-white/30 bg-white/20 px-3 py-1.5 text-white/90">
-            <select value={matchFilter} onChange={(event) => setMatchFilter(event.target.value as typeof matchFilter)} className="bg-transparent text-sm outline-none">
+          <div className="w-full shrink-0 rounded-full border border-white/30 bg-white/20 px-3 py-1.5 text-white/90 sm:w-auto">
+            <select value={matchFilter} onChange={(event) => setMatchFilter(event.target.value as typeof matchFilter)} className="w-full min-w-0 bg-transparent text-sm outline-none sm:w-auto">
               <option value="ALL" className="text-black">All reports</option>
               <option value="HAS_MATCHES" className="text-black">Matched only</option>
               <option value="NO_MATCHES" className="text-black">Without matches</option>
             </select>
           </div>
 
-          <div className="flex items-center gap-2 rounded-full border border-white/30 bg-white/20 px-3 py-1.5 text-white/90">
-            <CalendarDays className="w-4 h-4" />
-            <input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} className="bg-transparent text-sm outline-none" />
+          <div className="flex w-full shrink-0 flex-wrap items-center gap-2 rounded-full border border-white/30 bg-white/20 px-3 py-1.5 text-white/90 sm:w-auto">
+            <CalendarDays className="h-4 w-4 shrink-0" />
+            <input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} className="min-w-0 bg-transparent text-sm outline-none" />
             <span className="text-white/50">→</span>
-            <input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} className="bg-transparent text-sm outline-none" />
+            <input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} className="min-w-0 bg-transparent text-sm outline-none" />
           </div>
 
-          <div className="flex items-center gap-2 rounded-full border border-white/30 bg-white/20 px-3 py-1.5 text-white/90">
-            <ArrowUpDown className="w-4 h-4" />
-            <select value={sortBy} onChange={(event) => setSortBy(event.target.value as SortValue)} className="bg-transparent text-sm outline-none">
+          <div className="flex w-full shrink-0 items-center gap-2 rounded-full border border-white/30 bg-white/20 px-3 py-1.5 text-white/90 sm:w-auto">
+            <ArrowUpDown className="h-4 w-4 shrink-0" />
+            <select value={sortBy} onChange={(event) => setSortBy(event.target.value as SortValue)} className="min-w-0 bg-transparent text-sm outline-none">
               <option value="latest" className="text-black">Latest</option>
               <option value="oldest" className="text-black">Oldest</option>
               <option value="best_match" className="text-black">Best match</option>
@@ -434,7 +436,7 @@ export function CaseCollectionSection({
           </div>
 
           {addReportHref && addReportLabel ? (
-            <Link href={addReportHref} className="px-4 py-2 rounded-full bg-white/20 text-white font-black hover:bg-white/30 transition-all border border-white/20 whitespace-nowrap">
+            <Link href={addReportHref} className="w-full shrink-0 rounded-full border border-white/20 bg-white/20 px-4 py-2 text-center text-sm font-black text-white transition-all hover:bg-white/30 sm:w-auto md:text-base">
               {addReportLabel}
             </Link>
           ) : null}

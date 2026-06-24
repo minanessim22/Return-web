@@ -21,10 +21,10 @@ export default function RootLayout({
       <body suppressHydrationWarning className="h-full font-sans antialiased">
         <AuthProvider>
           <BackButtonProvider>
-            <div className="fixed left-4 top-4 z-50 pointer-events-auto md:left-6 md:top-5">
-              <Logo />
+            <div className="fixed left-3 top-3 z-50 pointer-events-auto sm:left-4 sm:top-4 md:left-6 md:top-5">
+              <Logo width={100} height={32} />
             </div>
-            <div className="fixed left-4 top-[42px] z-50 pointer-events-auto md:left-6 md:top-[58px]">
+            <div className="fixed left-3 top-[38px] z-50 pointer-events-auto sm:left-4 sm:top-[42px] md:left-6 md:top-[58px]">
               <BackButton />
             </div>
             {children}

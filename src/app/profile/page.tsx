@@ -13,10 +13,10 @@ export default function ProfileRedirectPage() {
   }, [router]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#014CB3] to-[#60C10F] text-white text-center px-6">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-[#014CB3] to-[#60C10F] px-4 py-8 text-center text-white sm:px-6">
       <div>
-        <h1 className="text-3xl font-black mb-3">Opening profile</h1>
-        <p className="text-white/80">Redirecting to your profile settings…</p>
+        <h1 className="mb-3 text-2xl font-black sm:text-3xl">Opening profile</h1>
+        <p className="text-sm text-white/80 sm:text-base">Redirecting to your profile settings…</p>
       </div>
     </div>
   );

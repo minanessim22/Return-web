@@ -199,10 +199,10 @@ export function ProfileSettingsPanel({ t }: { t: Translations }) {
   }, [form.dateOfBirth, form.email, form.name, form.phone, form.username, tr, user?.id]);
 
   return (
-    <div className="flex h-full flex-col gap-6 xl:flex-row">
-      <aside className="flex flex-col gap-4 xl:w-[300px]">
-        <div className="rounded-[2rem] border border-white/10 bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
-          <div className="relative mx-auto h-32 w-32 overflow-hidden rounded-full border-4 border-[#d8ecff] bg-slate-100 shadow-lg">
+    <div className="flex h-full flex-col gap-4 sm:gap-6 xl:flex-row">
+      <aside className="flex w-full flex-col gap-4 xl:w-[300px]">
+        <div className="rounded-[1.5rem] border border-white/10 bg-white p-4 shadow-[0_20px_60px_rgba(15,23,42,0.08)] sm:rounded-[2rem] sm:p-6">
+          <div className="relative mx-auto h-24 w-24 overflow-hidden rounded-full border-4 border-[#d8ecff] bg-slate-100 shadow-lg sm:h-32 sm:w-32">
             {form.avatarUrl ? (
               <img src={form.avatarUrl} alt={form.name || user?.name || 'Profile'} className="h-full w-full object-cover" />
             ) : (
@@ -217,7 +217,7 @@ export function ProfileSettingsPanel({ t }: { t: Translations }) {
           </div>
 
           <div className="mt-4 text-center">
-            <p className="text-xl font-black text-slate-800">{form.name || user?.name || 'RETURN user'}</p>
+            <p className="text-lg font-black text-slate-800 sm:text-xl">{form.name || user?.name || 'RETURN user'}</p>
             <p className="mt-1 text-sm font-semibold text-[#60C10F]">@{form.username || user?.username || 'return-user'}</p>
             <p className="mt-2 break-all text-xs text-slate-500">{form.email || user?.email || '—'}</p>
           </div>
@@ -255,10 +255,10 @@ export function ProfileSettingsPanel({ t }: { t: Translations }) {
         </div>
       </aside>
 
-      <section className="flex-1 rounded-[2rem] border border-white/10 bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] md:p-8">
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-2xl font-black text-slate-800">{tr('userSettings', 'User Settings')}</h2>
+      <section className="flex-1 rounded-[1.5rem] border border-white/10 bg-white p-4 shadow-[0_20px_60px_rgba(15,23,42,0.08)] sm:rounded-[2rem] sm:p-6 md:p-8">
+        <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <h2 className="text-xl font-black text-slate-800 sm:text-2xl">{tr('userSettings', 'User Settings')}</h2>
             <p className="mt-2 text-sm text-slate-500">Your personal information is editable here, including an optional profile photo that is saved to your account.</p>
           </div>
           <div className="flex flex-wrap gap-2">

@@ -69,7 +69,7 @@ export function SplashSequence() {
   return (
     <div className="fixed inset-0 bg-white overflow-hidden">
       <LayoutGroup>
-        <div className="w-full h-full flex items-center justify-center">
+        <div className="flex h-full w-full items-center justify-center px-3 sm:px-4">
 
           {/* Phase 1 & 2: Large centered R */}
           {(currentPhase === "large-r") && (
@@ -88,7 +88,7 @@ export function SplashSequence() {
                 alt="R"
                 width={600}
                 height={600}
-                className="w-[35vw] h-[35vw] max-w-[320px] max-h-[320px] min-w-[200px] min-h-[200px] object-contain"
+                className="h-[35vw] w-[35vw] min-h-[140px] min-w-[140px] max-h-[320px] max-w-[320px] object-contain sm:min-h-[200px] sm:min-w-[200px]"
                 priority
               />
             </motion.div>
@@ -97,12 +97,11 @@ export function SplashSequence() {
           {/* Phase 3 & 4: Complete word formation with layout animations */}
           {(currentPhase === "word-assembly" || currentPhase === "zoom-in" || currentPhase === "complete") && (
             <motion.div
-              className="flex items-center justify-center"
-              style={{ gap: "0.8vw" }}
+              className="flex max-w-full flex-wrap items-center justify-center gap-1 sm:gap-[0.8vw]"
               initial={{ opacity: 0 }}
               animate={{
                 opacity: 1,
-                scale: currentPhase === "zoom-in" || currentPhase === "complete" ? 2.5 : 1
+                scale: currentPhase === "zoom-in" || currentPhase === "complete" ? 1.75 : 1
               }}
               transition={{
                 opacity: { duration: 0.3 },
@@ -163,7 +162,11 @@ export function SplashSequence() {
                       alt={letterData.letter}
                       width={200}
                       height={200}
-                      className="w-[7vw] h-[7vw] max-w-[85px] max-h-[85px] min-w-[50px] min-h-[50px] md:w-[6vw] md:h-[6vw] md:max-w-[100px] md:max-h-[100px] lg:w-[5vw] lg:h-[5vw] lg:max-w-[120px] lg:max-h-[120px] object-contain"
+                      className={
+                        index < 4
+                          ? "h-[11vw] w-[11vw] min-h-[78px] min-w-[78px] max-h-[186px] max-w-[186px] object-contain sm:min-h-[78px] sm:min-w-[78px] md:h-[9.2vw] md:w-[9.2vw] md:max-h-[186px] md:max-w-[186px] lg:h-[7.8vw] lg:w-[7.8vw] lg:max-h-[186px] lg:max-w-[186px]"
+                          : "h-[7vw] w-[7vw] min-h-[36px] min-w-[36px] max-h-[85px] max-w-[85px] object-contain sm:min-h-[50px] sm:min-w-[50px] md:h-[6vw] md:w-[6vw] md:max-h-[100px] md:max-w-[100px] lg:h-[5vw] lg:w-[5vw] lg:max-h-[120px] lg:max-w-[120px]"
+                      }
                       priority={index < 3}
                     />
                   </motion.div>

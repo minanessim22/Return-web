@@ -14,7 +14,7 @@ export function SplashScreen({ current, variant }: SplashScreenProps) {
   return (
     <MobileShell>
       <ScreenNav current={current} />
-      <section className="relative flex min-h-[700px] items-center justify-center bg-white">
+      <section className="relative flex min-h-[480px] items-center justify-center bg-white sm:min-h-[600px] md:min-h-[700px]">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_15%,rgba(96,193,15,0.1),transparent_40%),radial-gradient(circle_at_85%_85%,rgba(1,76,179,0.1),transparent_42%)]" />
 
         {variant === "empty" ? (
