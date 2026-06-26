@@ -97,7 +97,7 @@ export function SplashSequence() {
           {/* Phase 3 & 4: Complete word formation with layout animations */}
           {(currentPhase === "word-assembly" || currentPhase === "zoom-in" || currentPhase === "complete") && (
             <motion.div
-              className="flex max-w-full flex-wrap items-center justify-center gap-1 sm:gap-[0.8vw]"
+              className="flex max-w-full flex-nowrap items-center justify-center gap-[clamp(2px,1vw,8px)]"
               initial={{ opacity: 0 }}
               animate={{
                 opacity: 1,
@@ -130,31 +130,31 @@ export function SplashSequence() {
                     animate={
                       isVisible
                         ? {
-                            opacity: 1,
-                            y: 0,
-                            scale: 1,
-                            x: 0
-                          }
+                          opacity: 1,
+                          y: 0,
+                          scale: 1,
+                          x: 0
+                        }
                         : {
-                            opacity: 0,
-                            y: 30,
-                            scale: 0.7,
-                            x: 100
-                          }
+                          opacity: 0,
+                          y: 30,
+                          scale: 0.7,
+                          x: 100
+                        }
                     }
                     transition={
                       isFirstR
                         ? {
-                            type: "spring",
-                            stiffness: 200,
-                            damping: 25,
-                            duration: 0.8
-                          }
+                          type: "spring",
+                          stiffness: 200,
+                          damping: 25,
+                          duration: 0.8
+                        }
                         : {
-                            duration: 0.5,
-                            ease: [0.25, 0.46, 0.45, 0.94],
-                            delay: isVisible ? 0 : 0
-                          }
+                          duration: 0.5,
+                          ease: [0.25, 0.46, 0.45, 0.94],
+                          delay: isVisible ? 0 : 0
+                        }
                     }
                   >
                     <Image
@@ -164,8 +164,8 @@ export function SplashSequence() {
                       height={200}
                       className={
                         index < 4
-                          ? "h-[11vw] w-[11vw] min-h-[78px] min-w-[78px] max-h-[186px] max-w-[186px] object-contain sm:min-h-[78px] sm:min-w-[78px] md:h-[9.2vw] md:w-[9.2vw] md:max-h-[186px] md:max-w-[186px] lg:h-[7.8vw] lg:w-[7.8vw] lg:max-h-[186px] lg:max-w-[186px]"
-                          : "h-[7vw] w-[7vw] min-h-[36px] min-w-[36px] max-h-[85px] max-w-[85px] object-contain sm:min-h-[50px] sm:min-w-[50px] md:h-[6vw] md:w-[6vw] md:max-h-[100px] md:max-w-[100px] lg:h-[5vw] lg:w-[5vw] lg:max-h-[120px] lg:max-w-[120px]"
+                          ? "h-[11vw] w-[11vw] max-h-[186px] max-w-[186px] object-contain md:h-[9.2vw] md:w-[9.2vw] lg:h-[7.8vw] lg:w-[7.8vw]"
+                          : "h-[7vw] w-[7vw] max-h-[85px] max-w-[85px] object-contain md:h-[6vw] md:w-[6vw] lg:h-[5vw] lg:w-[5vw]"
                       }
                       priority={index < 3}
                     />
