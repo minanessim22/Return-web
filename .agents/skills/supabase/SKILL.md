@@ -6,6 +6,7 @@ metadata:
   version: "0.1.2"
 ---
 
+
 # Supabase
 
 ## Core Principles
